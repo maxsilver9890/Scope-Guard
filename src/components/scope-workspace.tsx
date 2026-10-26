@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useState,
   type FormEvent,
   type KeyboardEvent,
@@ -14,6 +15,12 @@ import {
   type ItemChange,
   type ScopeComparison,
 } from "@/lib/diff";
+import {
+  scrollToSection,
+  ScopeNav,
+  useActiveSection,
+  type NavItem,
+} from "@/components/scope-nav";
 import type {
   Clarification,
   Finding,
@@ -31,55 +38,100 @@ type ScopeItemSection =
   | "requirements"
   | "acceptanceCriteria";
 
-const FINDING_STYLES: Record<string, { label: string; badge: string }> = {
+const FINDING_STYLES: Record<
+  string,
+  { label: string; badge: string; rail: string }
+> = {
   ambiguity: {
     label: "Ambiguity",
-    badge: "border-[#E4D3AC] bg-[#F7EFDD] text-[#74531C]",
+    badge: "border-amber-200 bg-amber-50 text-amber-800",
+    rail: "border-l-amber-300",
   },
   contradiction: {
     label: "Contradiction",
-    badge: "border-[#E9CBC5] bg-[#F8E8E4] text-[#843B2F]",
+    badge: "border-rose-200 bg-rose-50 text-rose-800",
+    rail: "border-l-rose-300",
   },
   "missing-info": {
     label: "Missing information",
-    badge: "border-[#CDDEE7] bg-[#E9F0F4] text-[#325468]",
+    badge: "border-sky-200 bg-sky-50 text-sky-800",
+    rail: "border-l-sky-300",
   },
   "unsupported-assumption": {
     label: "Unsupported assumption",
-    badge: "border-[#E9D1B9] bg-[#F8EBDD] text-[#835026]",
+    badge: "border-orange-200 bg-orange-50 text-orange-800",
+    rail: "border-l-orange-300",
   },
 };
 
 const STATUS_STYLES: Record<
   string,
-  { label: string; badge: string; description: string }
+  {
+    label: string;
+    badge: string;
+    description: string;
+    dot: string;
+  }
 > = {
   confirmed: {
     label: "Confirmed",
-    badge: "border-[#CFE0D3] bg-[#EEF4EF] text-[#2F5A47]",
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-800",
     description: "Stated in the source",
+    dot: "bg-emerald-500",
   },
   inferred: {
     label: "Inferred",
-    badge: "border-[#D6DFEA] bg-[#EEF3F9] text-[#3E5570]",
+    badge: "border-sky-200 bg-sky-50 text-sky-800",
     description: "Interpretation, rationale shown",
+    dot: "bg-sky-500",
   },
   proposed: {
     label: "Proposed",
-    badge: "border-[#E6D6B8] bg-[#F8F1E3] text-[#7A5A1E]",
+    badge: "border-amber-200 bg-amber-50 text-amber-800",
     description: "Needs client approval",
+    dot: "bg-amber-500",
   },
   unresolved: {
     label: "Unresolved",
-    badge: "border-line bg-canvas text-muted",
+    badge: "border-slate-200 bg-slate-100 text-slate-700",
     description: "Open decision",
+    dot: "bg-slate-400",
   },
 };
 
 const FALLBACK_BADGE = "border-line bg-canvas text-muted";
 
+const ITEM_SECTIONS = [
+  "inScope",
+  "outOfScope",
+  "assumptions",
+  "openQuestions",
+  "requirements",
+  "acceptanceCriteria",
+] as const;
+
+function countStatuses(scope: Scope) {
+  const counts = {
+    confirmed: 0,
+    inferred: 0,
+    proposed: 0,
+    unresolved: 0,
+  };
+
+  for (const section of ITEM_SECTIONS) {
+    for (const item of scope[section]) {
+      counts[item.status] += 1;
+    }
+  }
+
+  return counts;
+}
+
 const TOOLBAR_BUTTON =
-  "inline-flex h-9 items-center gap-2 rounded-md border border-line bg-surface px-3 text-[11px] font-medium text-forest transition-colors duration-200 hover:border-forest/30 hover:bg-sage/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+  "inline-flex h-9 items-center gap-2 rounded-xl border border-line/80 bg-white/70 px-3 text-[11px] font-medium text-forest transition-all duration-200 hover:border-accent/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+
+const TOOLBAR_PRIMARY =
+  "inline-flex h-9 items-center gap-2 rounded-xl bg-accent px-3.5 text-[11px] font-medium text-white shadow-[0_1px_2px_rgba(79,70,229,0.28),0_8px_20px_-12px_rgba(79,70,229,0.6)] transition-all duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -187,7 +239,7 @@ function EmptyMotif() {
         width="67"
         height="67"
         rx="2"
-        stroke="#18352F"
+        stroke="#1B2440"
         strokeOpacity="0.16"
       />
       <rect
@@ -196,16 +248,16 @@ function EmptyMotif() {
         width="39"
         height="39"
         rx="1"
-        stroke="#18352F"
+        stroke="#1B2440"
         strokeOpacity="0.24"
         strokeDasharray="2 4"
       />
       <path
         d="M12.5 46h12M67.5 46h12M46 12.5v12M46 67.5v12"
-        stroke="#18352F"
+        stroke="#1B2440"
         strokeOpacity="0.22"
       />
-      <circle cx="46" cy="46" r="3" fill="#B18A50" />
+      <circle cx="46" cy="46" r="3" fill="#4F46E5" />
     </svg>
   );
 }
@@ -214,10 +266,14 @@ function StatusBadge({ status }: { status: string }) {
   const style = STATUS_STYLES[status];
   return (
     <span
-      className={`inline-flex items-center rounded-[3px] border px-1.5 py-0.5 text-[8.5px] font-semibold uppercase leading-none tracking-[0.1em] ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9.5px] font-semibold uppercase leading-none tracking-[0.08em] ${
         style?.badge ?? FALLBACK_BADGE
       }`}
     >
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${style?.dot ?? "bg-muted/50"}`}
+      />
       {style?.label ?? status}
     </span>
   );
@@ -225,7 +281,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function StatusLegend() {
   return (
-    <dl className="grid gap-x-6 gap-y-3 border-b border-line/70 px-5 py-4 sm:grid-cols-2 sm:px-7 lg:grid-cols-4 lg:px-9">
+    <dl className="grid gap-x-6 gap-y-2.5 border-b border-line/60 bg-slate-50/40 px-5 py-4 sm:grid-cols-2 sm:px-7 lg:px-9">
       {(["confirmed", "inferred", "proposed", "unresolved"] as const).map(
         (status) => (
           <div key={status} className="flex items-start gap-2">
@@ -243,21 +299,26 @@ function StatusLegend() {
 }
 
 function DocumentSection({
+  id,
   title,
   children,
 }: {
+  id: string;
   title: string;
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-line/70 py-6 first:border-t-0 first:pt-5 last:pb-7">
+    <section
+      id={id}
+      className="scroll-mt-32 border-t border-line/60 py-7 first:border-t-0 first:pt-6 last:pb-8 lg:scroll-mt-24"
+    >
       <div className="flex items-center gap-3">
-        <span aria-hidden="true" className="h-px w-4 shrink-0 bg-brass/70" />
-        <h3 className="text-[10.5px] font-semibold uppercase leading-5 tracking-[0.18em] text-forest/70">
+        <span aria-hidden="true" className="h-px w-5 shrink-0 bg-accent/60" />
+        <h3 className="text-[10.5px] font-semibold uppercase leading-5 tracking-[0.2em] text-forest/75">
           {title}
         </h3>
       </div>
-      <div className="mt-3 sm:pl-7">{children}</div>
+      <div className="mt-3.5 sm:pl-8">{children}</div>
     </section>
   );
 }
@@ -273,12 +334,18 @@ function EmptyNote() {
 function ClarificationStateBadge({ confirmed }: { confirmed: boolean }) {
   return (
     <span
-      className={`inline-flex items-center rounded-[3px] border px-1.5 py-0.5 text-[8.5px] font-semibold uppercase leading-none tracking-[0.1em] ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase leading-none tracking-[0.08em] ${
         confirmed
-          ? "border-[#CFE0D3] bg-[#EEF4EF] text-[#2F5A47]"
-          : "border-line bg-canvas text-muted"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-slate-200 bg-slate-100 text-slate-600"
       }`}
     >
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${
+          confirmed ? "bg-emerald-500" : "bg-slate-400"
+        }`}
+      />
       {confirmed ? "Client confirmed" : "Unconfirmed note"}
     </span>
   );
@@ -325,7 +392,7 @@ function ScopeItemList({
                 </p>
               ) : null}
               {clarification ? (
-                <p className="mt-1 text-[10.5px] leading-5 text-forest/60">
+                <p className="mt-1 text-[10.5px] leading-5 text-muted">
                   {clarification.confirmed
                     ? "From a client-confirmed clarification"
                     : "From an unconfirmed note"}
@@ -382,7 +449,7 @@ function ScopeItemEditor({
               onChange={(event) => onChange(index, event.target.value)}
               rows={2}
               aria-label={`${label} item ${index + 1}`}
-              className="block w-full resize-y rounded-md border border-line bg-[#FDFDFB] px-3 py-2 text-[13px] leading-6 text-ink/90 outline-none transition-colors focus:border-forest/70 focus:ring-4 focus:ring-sage"
+              className="block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[13px] leading-6 text-ink/90 outline-none transition-colors focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
             />
             {item.rationale && item.status !== "confirmed" ? (
               <p className="mt-1 text-[11.5px] leading-5 text-muted">
@@ -463,7 +530,7 @@ function ResolveQuestionForm({
         onChange={(event) => setAnswer(event.target.value)}
         rows={3}
         placeholder="Record the answer the client actually gave…"
-        className="mt-1.5 block w-full resize-y rounded-md border border-line bg-[#FDFDFB] px-3 py-2 text-[12.5px] leading-5 text-ink/90 outline-none transition-colors placeholder:text-muted/60 focus:border-forest/70 focus:ring-4 focus:ring-sage"
+        className="mt-1.5 block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[12.5px] leading-5 text-ink/90 outline-none transition-colors placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
       />
 
       <label className="mt-3 flex items-start gap-2.5">
@@ -471,7 +538,7 @@ function ResolveQuestionForm({
           type="checkbox"
           checked={confirmed}
           onChange={(event) => setConfirmed(event.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 accent-forest"
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[#4f46e5]"
         />
         <span className="text-[11px] leading-5 text-muted">
           <span className="font-medium text-ink">
@@ -484,8 +551,8 @@ function ResolveQuestionForm({
       </label>
 
       {isEdited ? (
-        <div className="mt-3 rounded-md border border-[#E6D6B8] bg-[#FBF6EC] px-3 py-2.5">
-          <p className="text-[11px] leading-5 text-[#74531C]">
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <p className="text-[11px] leading-5 text-amber-800">
             This document has manual edits. Regenerating the scope will replace
             them.
           </p>
@@ -494,9 +561,9 @@ function ResolveQuestionForm({
               type="checkbox"
               checked={acknowledgeEdits}
               onChange={(event) => setAcknowledgeEdits(event.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-forest"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#4f46e5]"
             />
-            <span className="text-[11px] leading-5 text-[#74531C]">
+            <span className="text-[11px] leading-5 text-amber-800">
               I understand these edits will be replaced.
             </span>
           </label>
@@ -511,7 +578,7 @@ function ResolveQuestionForm({
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 text-[11px] leading-5 text-[#7E3A2D]">
+        <p role="alert" className="mt-3 text-[11px] leading-5 text-rose-800">
           {error}
         </p>
       ) : null}
@@ -520,7 +587,7 @@ function ResolveQuestionForm({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="inline-flex h-9 items-center gap-2 rounded-md bg-forest px-3.5 text-[11px] font-medium text-[#F7F6F2] transition-colors hover:bg-[#122A25] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:bg-forest/50"
+          className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3.5 text-[11px] font-medium text-white transition-colors hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:bg-accent/45"
         >
           {pending ? (
             <>
@@ -554,7 +621,11 @@ function ClarificationList({
       {clarifications.map((clarification) => (
         <li
           key={clarification.id}
-          className="rounded-lg border border-line bg-canvas/50 px-4 py-3"
+          className={`rounded-xl border border-line/70 border-l-2 bg-white px-4 py-3 ${
+            clarification.confirmed
+              ? "border-l-emerald-300"
+              : "border-l-slate-300"
+          }`}
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <p className="max-w-[60ch] text-[12.5px] font-medium leading-5 text-ink">
@@ -626,7 +697,7 @@ function ComparisonItemRow({ change }: { change: ItemChange }) {
         <span
           className={
             change.kind === "added"
-              ? "text-[#7A5A1E]"
+              ? "text-amber-800"
               : change.kind === "removed"
                 ? "text-[#843B2F]"
                 : "text-forest"
@@ -660,7 +731,9 @@ function ComparisonItemRow({ change }: { change: ItemChange }) {
             </>
           ) : (
             <p className="text-[11.5px] leading-5 text-muted">
-              Source attribution changed.
+              {change.statusChanged
+                ? "Commitment status updated."
+                : "Source attribution changed."}
             </p>
           )}
           {change.afterRationale ? (
@@ -703,8 +776,9 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
 
   return (
     <section
+      id="changes"
       aria-labelledby="comparison-heading"
-      className="rounded-xl border border-[#D9E4DC] bg-sage/45 p-4 sm:p-5"
+      className="scroll-mt-32 rounded-2xl border border-accent-line/80 bg-accent-soft/60 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:scroll-mt-24 sm:p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -736,7 +810,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
         </p>
         <p
           className={`mt-2 text-[11px] leading-5 ${
-            comparison.questionResolved ? "text-forest" : "text-[#7A5A1E]"
+            comparison.questionResolved ? "text-forest" : "text-amber-800"
           }`}
         >
           {comparison.questionResolved
@@ -800,7 +874,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
                     <ComparisonFindingRow
                       key={`resolved-${index}`}
                       finding={finding}
-                      label="No longer reported after clarification"
+                      label="Resolved"
                     />
                   ))}
                 </ul>
@@ -817,7 +891,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
                     <ComparisonFindingRow
                       key={`remaining-${index}`}
                       finding={finding}
-                      label="Still present"
+                      label="Retained"
                     />
                   ))}
                 </ul>
@@ -855,7 +929,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
 
             {findings.added.length > 0 ? (
               <div>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-[#7A5A1E]">
+                <p className="text-[9px] uppercase tracking-[0.16em] text-amber-800">
                   New
                 </p>
                 <ul className="mt-1.5 space-y-2">
@@ -863,7 +937,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
                     <ComparisonFindingRow
                       key={`added-${index}`}
                       finding={finding}
-                      label="New finding"
+                      label="New"
                     />
                   ))}
                 </ul>
@@ -880,7 +954,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
                     <ComparisonFindingRow
                       key={`unmatched-${index}`}
                       finding={finding}
-                      label="Could not be confidently matched"
+                      label="Unmatched"
                     />
                   ))}
                 </ul>
@@ -913,7 +987,11 @@ function FindingCard({
     : undefined;
 
   return (
-    <article className="rounded-lg border border-line bg-surface p-4 transition-colors duration-200 hover:border-forest/25 sm:p-5">
+    <article
+      className={`rounded-xl border border-line/70 border-l-2 ${
+        style?.rail ?? "border-l-line"
+      } bg-white p-4 transition-colors duration-200 hover:border-accent/30 sm:p-5`}
+    >
       <div className="flex items-start justify-between gap-4">
         <span
           className={`inline-flex items-center rounded-[3px] border px-2 py-1 text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] ${badge}`}
@@ -929,15 +1007,19 @@ function FindingCard({
         {finding.description}
       </p>
 
-      <p className="mt-2.5 text-[12.5px] leading-6 text-muted">
-        <span className="font-medium text-forest/80">Why it matters:</span>{" "}
-        {finding.whyItMatters}
-      </p>
+      <div className="mt-3">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted">
+          Why it matters
+        </p>
+        <p className="mt-1 text-[12.5px] leading-6 text-muted">
+          {finding.whyItMatters}
+        </p>
+      </div>
 
       {snippet ? (
-        <blockquote className="mt-3.5 whitespace-pre-line border-l-2 border-forest/50 bg-sage/70 px-3.5 py-2.5 text-[12px] italic leading-6 text-forest/80">
+        <blockquote className="mt-3.5 whitespace-pre-line border-l-2 border-accent/40 bg-accent-soft/60 px-3.5 py-2.5 text-[12px] italic leading-6 text-forest/80">
           {finding.sourceKind === "clarification" ? (
-            <span className="mb-1 block text-[8.5px] font-medium uppercase not-italic tracking-[0.14em] text-forest/60">
+            <span className="mb-1 block text-[9px] font-medium uppercase not-italic tracking-[0.14em] text-muted">
               {clarification?.confirmed === false
                 ? "Source: unconfirmed clarification"
                 : "Source: client clarification"}
@@ -969,6 +1051,57 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   const isAnalyzing = status === "loading";
   const hasResults =
     scope !== null && editedScope !== null && findings !== null;
+  const statusCounts =
+    hasResults && editedScope ? countStatuses(editedScope) : null;
+
+  const navItems: NavItem[] =
+    hasResults && editedScope
+      ? [
+          { id: "overview", label: "Overview", icon: "overview" },
+          { id: "in-scope", label: "In Scope", icon: "in-scope" },
+          { id: "out-of-scope", label: "Out of Scope", icon: "out-of-scope" },
+          { id: "assumptions", label: "Assumptions", icon: "assumptions" },
+          { id: "open-questions", label: "Open Questions", icon: "questions" },
+          { id: "requirements", label: "Requirements", icon: "requirements" },
+          {
+            id: "acceptance-criteria",
+            label: "Acceptance Criteria",
+            icon: "acceptance",
+          },
+          { id: "risks", label: "Delivery Risks", icon: "risks" },
+          ...(editedScope.clarifications.length > 0
+            ? [
+                {
+                  id: "clarifications",
+                  label: "Clarifications",
+                  icon: "clarifications" as const,
+                },
+              ]
+            : []),
+          ...(comparison
+            ? [
+                {
+                  id: "changes",
+                  label: "What Changed",
+                  icon: "changes" as const,
+                },
+              ]
+            : []),
+        ]
+      : [];
+
+  const hasSidebar = hasResults && navItems.length > 0;
+  const activeSection = useActiveSection(navItems.map((item) => item.id));
+  const comparisonKey = comparison
+    ? `${comparison.clarification.question}|${comparison.clarification.answer}`
+    : "";
+
+  useEffect(() => {
+    if (!comparisonKey) {
+      return;
+    }
+    scrollToSection("changes");
+  }, [comparisonKey]);
 
   const sourceStatus =
     status === "loading"
@@ -981,12 +1114,12 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
 
   const statusDot =
     status === "loading"
-      ? "bg-brass/60"
+      ? "bg-amber-400"
       : status === "success"
-        ? "bg-forest"
+        ? "bg-emerald-500"
         : status === "error"
-          ? "bg-[#A2543F]"
-          : "bg-brass";
+          ? "bg-rose-500"
+          : "bg-accent";
 
   const announcement =
     status === "loading"
@@ -1203,12 +1336,42 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   }
 
   return (
-    <section
-      aria-label="Scoping analysis workspace"
-      className="mt-8 grid grid-cols-1 gap-8 lg:mt-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8 xl:gap-12"
-    >
-      <aside aria-labelledby="brief-heading" className="min-w-0">
-        <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(24,53,47,0.04)]">
+    <section aria-label="Scoping analysis workspace" className="mt-6 lg:mt-8">
+      {hasSidebar ? (
+        <ScopeNav
+          variant="bar"
+          items={navItems}
+          activeId={activeSection}
+          onNavigate={scrollToSection}
+        />
+      ) : null}
+
+      <div
+        className={
+          hasSidebar
+            ? "lg:grid lg:grid-cols-[228px_minmax(0,1fr)] lg:gap-10 xl:gap-12"
+            : undefined
+        }
+      >
+        {hasSidebar ? (
+          <ScopeNav
+            variant="rail"
+            items={navItems}
+            activeId={activeSection}
+            onNavigate={scrollToSection}
+          />
+        ) : null}
+
+        <div className="min-w-0">
+          <div
+            className={
+              hasSidebar
+                ? "grid gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:gap-10"
+                : "grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10"
+            }
+          >
+      <aside aria-labelledby="brief-heading" className="min-w-0 xl:sticky xl:top-24 xl:self-start">
+        <div className="overflow-hidden rounded-2xl border border-line/70 bg-white/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_24px_48px_-32px_rgba(15,23,42,0.3)] backdrop-blur-xl">
           <div className="border-b border-line/80 px-5 py-5 sm:px-6">
             <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-brass">
               01 / Source material
@@ -1257,7 +1420,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               spellCheck={false}
               placeholder="Paste a discovery transcript, meeting notes, or a rough project brief…"
               aria-describedby="source-helper"
-              className="mt-2.5 block max-h-[70vh] min-h-[380px] w-full resize-y rounded-md border border-line bg-[#FDFDFB] px-4 py-3.5 font-sans text-[13px] leading-[1.75] text-ink/90 shadow-[inset_0_1px_2px_rgba(24,53,47,0.03)] outline-none transition-colors duration-200 placeholder:text-muted/60 focus:border-forest/70 focus:ring-4 focus:ring-sage"
+              className="mt-2.5 block max-h-[70vh] min-h-[380px] w-full resize-y rounded-md border border-line bg-white px-4 py-3.5 font-sans text-[13px] leading-[1.75] text-ink/90 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-colors duration-200 placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
             />
 
             <div
@@ -1277,7 +1440,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                 isAnalyzing || isResolving || input.trim().length === 0
               }
               aria-busy={isAnalyzing}
-              className="group mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-forest px-5 text-[13px] font-medium tracking-[0.01em] text-[#F7F6F2] transition-colors duration-200 hover:bg-[#122A25] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-forest/50 disabled:text-[#F7F6F2]/80"
+              className="group mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-accent px-5 text-[13px] font-medium tracking-[0.01em] text-white shadow-[0_1px_2px_rgba(79,70,229,0.3),0_10px_24px_-14px_rgba(79,70,229,0.7)] transition-colors duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-accent/45 disabled:text-white/80"
             >
               {isAnalyzing ? (
                 <>
@@ -1295,7 +1458,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             {error ? (
               <div
                 role="alert"
-                className="mt-3.5 flex items-start gap-2.5 rounded-md border border-[#E6C9C2] bg-[#FAEDEA] px-3.5 py-3 text-[12px] leading-5 text-[#7E3A2D]"
+                className="mt-3.5 flex items-start gap-2.5 rounded-md border border-rose-200 bg-rose-50 px-3.5 py-3 text-[12px] leading-5 text-rose-800"
               >
                 <svg
                   viewBox="0 0 16 16"
@@ -1378,16 +1541,13 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               </div>
             ) : null}
 
-            {comparison ? (
-              <ComparisonPanel comparison={comparison} />
-            ) : null}
-
             <article
               aria-labelledby="scope-doc-heading"
-              className="overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(24,53,47,0.04)]"
+              className="overflow-hidden rounded-2xl border border-line/70 bg-white/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_24px_48px_-32px_rgba(15,23,42,0.3)] backdrop-blur-xl"
             >
-              <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line/80 px-5 py-6 sm:px-7 lg:px-9">
-                <div>
+              <header className="border-b border-line/60 px-5 py-6 sm:px-7 lg:px-9">
+                <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                  <div className="min-w-0">
                   <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-brass">
                     Scope document
                   </p>
@@ -1402,14 +1562,16 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     <span aria-hidden="true" className="h-3 w-px bg-line" />
                     <span>Source: pasted brief</span>
                     {isEdited ? (
-                      <span className="rounded-[3px] border border-[#E6D6B8] bg-[#F8F1E3] px-1.5 py-0.5 text-[8.5px] tracking-[0.1em] text-[#7A5A1E]">
+                      <span className="rounded-[3px] border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[8.5px] tracking-[0.1em] text-amber-800">
                         Edited
                       </span>
                     ) : null}
                   </p>
+
+
                 </div>
 
-                <div className="flex flex-col items-start gap-1.5 sm:items-end">
+                  <div className="flex shrink-0 flex-col items-start gap-1.5 sm:items-end">
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
@@ -1427,7 +1589,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     <button
                       type="button"
                       onClick={handleExport}
-                      className={TOOLBAR_BUTTON}
+                      className={TOOLBAR_PRIMARY}
                     >
                       <DownloadIcon />
                       Export Markdown
@@ -1438,7 +1600,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     aria-live="polite"
                     className={`min-h-4 text-[10px] ${
                       exportStatus === "error"
-                        ? "text-[#7E3A2D]"
+                        ? "text-rose-800"
                         : "text-muted"
                     }`}
                   >
@@ -1449,12 +1611,46 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                         : ""}
                   </p>
                 </div>
+                </div>
+
+                {statusCounts ? (
+                  <ul className="mt-4 flex flex-wrap items-center gap-2">
+                    {(
+                      [
+                        "confirmed",
+                        "inferred",
+                        "proposed",
+                        "unresolved",
+                      ] as const
+                    ).map((status) => (
+                      <li
+                        key={status}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line/80 bg-white/70 px-2.5 py-1 text-[10.5px] font-medium text-muted"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`h-1.5 w-1.5 rounded-full ${STATUS_STYLES[status].dot}`}
+                        />
+                        <span className="font-mono tabular-nums text-ink">
+                          {statusCounts[status]}
+                        </span>
+                        <span>{STATUS_STYLES[status].label.toLowerCase()}</span>
+                      </li>
+                    ))}
+                    <li className="inline-flex items-center gap-1.5 rounded-full border border-line/80 bg-white/70 px-2.5 py-1 text-[10.5px] font-medium text-muted">
+                      <span className="font-mono tabular-nums text-ink">
+                        {findings?.length ?? 0}
+                      </span>
+                      <span>findings</span>
+                    </li>
+                  </ul>
+                ) : null}
               </header>
 
               <StatusLegend />
 
               <div className="px-5 pb-2 sm:px-7 lg:px-9">
-                <DocumentSection title="Problem Statement">
+                <DocumentSection id="overview" title="Problem Statement">
                   {isEditing ? (
                     <textarea
                       value={editedScope.problemStatement}
@@ -1463,7 +1659,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                       }
                       rows={4}
                       aria-label="Problem statement"
-                      className="block w-full resize-y rounded-md border border-line bg-[#FDFDFB] px-3 py-2 text-[13.5px] leading-6 text-ink/90 outline-none transition-colors focus:border-forest/70 focus:ring-4 focus:ring-sage"
+                      className="block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[13.5px] leading-6 text-ink/90 outline-none transition-colors focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
                     />
                   ) : (
                     <p className="max-w-[68ch] text-[14.5px] leading-7 text-ink/85">
@@ -1472,7 +1668,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   )}
                 </DocumentSection>
 
-                <DocumentSection title="In Scope">
+                <DocumentSection id="in-scope" title="In Scope">
                   {isEditing ? (
                     <ScopeItemEditor
                       items={editedScope.inScope}
@@ -1489,7 +1685,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   )}
                 </DocumentSection>
 
-                <DocumentSection title="Out of Scope">
+                <DocumentSection id="out-of-scope" title="Out of Scope">
                   {isEditing ? (
                     <ScopeItemEditor
                       items={editedScope.outOfScope}
@@ -1506,7 +1702,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   )}
                 </DocumentSection>
 
-                <DocumentSection title="Assumptions">
+                <DocumentSection id="assumptions" title="Assumptions">
                   {isEditing ? (
                     <ScopeItemEditor
                       items={editedScope.assumptions}
@@ -1523,7 +1719,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   )}
                 </DocumentSection>
 
-                <DocumentSection title="Open Questions">
+                <DocumentSection id="open-questions" title="Open Questions">
                   {isEditing ? (
                     <ScopeItemEditor
                       items={editedScope.openQuestions}
@@ -1566,15 +1762,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   )}
                 </DocumentSection>
 
-                {editedScope.clarifications.length > 0 ? (
-                  <DocumentSection title="Client Clarifications">
-                    <ClarificationList
-                      clarifications={editedScope.clarifications}
-                    />
-                  </DocumentSection>
-                ) : null}
-
-                <DocumentSection title="Requirements">
+                <DocumentSection id="requirements" title="Requirements">
                   {isEditing ? (
                     <ScopeItemEditor
                       items={editedScope.requirements}
@@ -1591,7 +1779,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   )}
                 </DocumentSection>
 
-                <DocumentSection title="Acceptance Criteria">
+                <DocumentSection id="acceptance-criteria" title="Acceptance Criteria">
                   {isEditing ? (
                     <ScopeItemEditor
                       items={editedScope.acceptanceCriteria}
@@ -1611,8 +1799,9 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             </article>
 
             <section
+              id="risks"
               aria-labelledby="findings-heading"
-              className="rounded-xl border border-line bg-sage/45 p-4 sm:p-6"
+              className="scroll-mt-32 rounded-2xl border border-line/70 bg-white/80 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:scroll-mt-24 sm:p-6"
             >
               <div className="flex flex-wrap items-end justify-between gap-4 px-1">
                 <div>
@@ -1629,7 +1818,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     Issues to resolve before committing to the scope.
                   </p>
                   {isEdited ? (
-                    <p className="mt-2 text-[11px] leading-5 text-[#7A5A1E]">
+                    <p className="mt-2 text-[11px] leading-5 text-amber-800">
                       Document edited after analysis — findings refer to the
                       analyzed version.
                     </p>
@@ -1662,8 +1851,53 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                 )}
               </div>
             </section>
+
+            {editedScope.clarifications.length > 0 ? (
+              <section
+                id="clarifications"
+                aria-labelledby="clarifications-heading"
+                className="scroll-mt-32 rounded-2xl border border-line/70 bg-white/80 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-30px_rgba(15,23,42,0.25)] backdrop-blur-xl lg:scroll-mt-24 sm:p-6"
+              >
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-accent">
+                      03 / Client clarifications
+                    </p>
+                    <h2
+                      id="clarifications-heading"
+                      className="mt-2 font-serif text-[24px] leading-tight tracking-[-0.01em] text-forest"
+                    >
+                      Recorded clarifications
+                    </h2>
+                    <p className="mt-1.5 max-w-[60ch] text-[12.5px] leading-5 text-muted">
+                      Client answers captured during review, kept separate from
+                      the original transcript.
+                    </p>
+                  </div>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted">
+                    <span className="font-mono tabular-nums">
+                      {editedScope.clarifications.length}
+                    </span>{" "}
+                    {editedScope.clarifications.length === 1
+                      ? "entry"
+                      : "entries"}
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <ClarificationList
+                    clarifications={editedScope.clarifications}
+                  />
+                </div>
+              </section>
+            ) : null}
+
+            {comparison ? <ComparisonPanel comparison={comparison} /> : null}
           </div>
         )}
+        </div>
+        </div>
+      </div>
       </div>
     </section>
   );
