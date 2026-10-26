@@ -1,0 +1,20 @@
+[Discovery call — Tuesday, 10:04am]
+Present: Dana Whitfield (Operations, Northwind Interiors), me
+
+Dana: So basically — okay, where do I start. We've grown from like six people to almost forty in two years, and honestly the way we run projects now is, um, it's just not working anymore.
+Dana: Everything lives in email and WhatsApp. My project managers each have their own spreadsheet. I have no idea what's actually happening on a job until a client complains.
+Me: When you say you don't know what's happening, what would you want to see instead?
+Dana: Everything, really. I want one place. Like a dashboard. I saw something at a trade show, it had little colored bars, that's the kind of thing.
+Dana: And it should talk to our accounting system — well, our bookkeeper uses something, I'd have to ask her the name. And the estimating tool, I think it's the same company?
+Dana: The main thing is the team. They need to be able to see what's on their plate without me forwarding emails all day. That's probably half my week right now.
+Me: So a project and task view for the team, plus a management overview?
+Dana: Yes. But not too complicated. My guys are not... they're practical people, they won't use something with a hundred buttons. If it takes more than a couple of clicks they'll go back to WhatsApp.
+Dana: Also the clients. I'd love clients to be able to log in and see progress. Maybe not in the first version. Actually, some clients would love that. But then again some of them would use it to nitpick everything, so.
+Me: Should we include client access in v1?
+Dana: Let's say yes for now, we can always take it out. Hmm, but security — our contracts, the photos, all that. I don't know how that works.
+Dana: Oh, and reporting. I need a report for the Monday meeting. Nothing fancy, just where each job is, who's behind, what's late.
+Dana: Budget too, if it's easy. We lose money on jobs and I only find out at the end. But I don't want the team seeing the margins, obviously.
+Me: Understood. Any deadline in mind?
+Dana: We're doing a big push in Q3, so before that. End of August? Though realistically if it's not ready we'll just keep doing what we're doing.
+Dana: Can I be honest, I don't know what this should cost. My nephew built something for his landscaping company in a weekend, but he said it was basic.
+Dana: Anyway — the dashboard is the main thing. If that works, the rest we can figure out.

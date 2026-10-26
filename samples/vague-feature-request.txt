@@ -1,0 +1,1 @@
+We need a way for customers to track their orders without calling support. Ideally it should show status updates and maybe estimated delivery. It should feel modern and work on mobile since most of our customers are on their phones. We'd like this live for the holiday season, and it should be easy for our team to update statuses without needing a developer.

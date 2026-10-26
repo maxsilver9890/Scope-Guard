@@ -1,0 +1,431 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import {
+  findQuoteOrigin,
+  enforceFindingProvenance,
+  repairScopeProvenance,
+} from "../src/lib/provenance.ts";
+import {
+  ResolveInputError,
+  resolveRequestSchema,
+  resolveScope,
+  type ResolveRequest,
+} from "../src/lib/resolve.ts";
+import type { Clarification, Finding, Scope } from "../src/lib/schema.ts";
+
+const TRANSCRIPT = `Dana: We need a dashboard for the team.
+Dana: I need a report for the Monday meeting. Nothing fancy.`;
+
+const QUESTION = "What is the report delivery time?";
+
+const CONFIRMED: Clarification = {
+  id: "c1",
+  question: QUESTION,
+  answer: "The report must be ready every Monday at 8 AM.",
+  confirmed: true,
+};
+
+const UNCONFIRMED: Clarification = { ...CONFIRMED, confirmed: false };
+
+function scope(overrides: Partial<Scope> = {}): Scope {
+  return {
+    problemStatement: "The team needs one place to see work.",
+    inScope: [
+      {
+        text: "A dashboard for the team",
+        status: "confirmed",
+        sourceQuote: "We need a dashboard for the team",
+      },
+    ],
+    outOfScope: [],
+    assumptions: [],
+    openQuestions: [{ text: QUESTION, status: "unresolved" }],
+    requirements: [
+      {
+        text: "The report must be ready before the Monday meeting.",
+        status: "proposed",
+        rationale: "The client asked for a report but did not set a delivery time.",
+      },
+    ],
+    acceptanceCriteria: [],
+    clarifications: [],
+    ...overrides,
+  };
+}
+
+function finding(
+  description: string,
+  sourceSnippet = "I need a report for the Monday meeting.",
+): Finding {
+  return {
+    type: "missing-info",
+    description,
+    whyItMatters: "Delivery time affects the build and the acceptance test.",
+    sourceSnippet,
+  };
+}
+
+function generatedScope(confirmed: boolean): Scope {
+  return {
+    problemStatement: "The team needs one place to see work.",
+    inScope: [
+      {
+        text: "A dashboard for the team",
+        status: "confirmed",
+        sourceQuote: "We need a dashboard for the team",
+      },
+    ],
+    outOfScope: [],
+    assumptions: [],
+    openQuestions: [],
+    requirements: [
+      {
+        text: "The report must be ready before the Monday meeting.",
+        status: "confirmed",
+        sourceQuote: "every Monday at 8 AM",
+      },
+    ],
+    acceptanceCriteria: [],
+    clarifications: confirmed ? [CONFIRMED] : [UNCONFIRMED],
+  };
+}
+
+function deps(
+  generated: Scope,
+  findings: Finding[] = [],
+  capture?: (input: string) => void,
+) {
+  return {
+    generateScope: async (input: string) => {
+      capture?.(input);
+      return generated;
+    },
+    critiqueScope: async () => findings,
+    newClarificationId: () => "c1",
+  };
+}
+
+function request(overrides: Partial<ResolveRequest> = {}): ResolveRequest {
+  return {
+    input: TRANSCRIPT,
+    scope: scope(),
+    findings: [finding("The report delivery time is undefined.")],
+    question: QUESTION,
+    answer: CONFIRMED.answer,
+    confirmed: true,
+    ...overrides,
+  };
+}
+
+test("findQuoteOrigin distinguishes transcript and clarification quotes", () => {
+  const corpus = { transcript: TRANSCRIPT, clarifications: [CONFIRMED] };
+
+  assert.deepEqual(findQuoteOrigin("We need a dashboard", corpus), {
+    kind: "transcript",
+    confirmed: true,
+  });
+  assert.deepEqual(findQuoteOrigin("every Monday at 8 AM", corpus), {
+    kind: "clarification",
+    clarificationId: "c1",
+    confirmed: true,
+  });
+  assert.equal(findQuoteOrigin("not in either source", corpus), undefined);
+});
+
+test("a confirmed clarification can support a confirmed requirement", () => {
+  const corpus = { transcript: TRANSCRIPT, clarifications: [CONFIRMED] };
+  const repaired = repairScopeProvenance(generatedScope(true), corpus);
+
+  assert.equal(repaired.scope.requirements[0].status, "confirmed");
+  assert.equal(repaired.scope.requirements[0].sourceKind, "clarification");
+  assert.equal(repaired.scope.requirements[0].clarificationId, "c1");
+});
+
+test("an unconfirmed clarification cannot support a confirmed requirement", () => {
+  const corpus = { transcript: TRANSCRIPT, clarifications: [UNCONFIRMED] };
+  const repaired = repairScopeProvenance(generatedScope(false), corpus);
+
+  assert.equal(repaired.scope.requirements[0].status, "proposed");
+  assert.match(
+    repaired.scope.requirements[0].rationale ?? "",
+    /unconfirmed/i,
+  );
+});
+
+test("clarification evidence is attributed on findings", () => {
+  const corpus = { transcript: TRANSCRIPT, clarifications: [CONFIRMED] };
+  const result = enforceFindingProvenance(
+    [finding("The confirmation adds a delivery time.", "every Monday at 8 AM")],
+    corpus,
+  );
+
+  assert.equal(result.findings.length, 1);
+  assert.equal(result.findings[0].sourceKind, "clarification");
+  assert.equal(result.findings[0].clarificationId, "c1");
+});
+
+test("fabricated clarification quotes are rejected", () => {
+  const corpus = { transcript: TRANSCRIPT, clarifications: [CONFIRMED] };
+  const result = enforceFindingProvenance(
+    [finding("Invented evidence.", "The client agreed to weekly emails.")],
+    corpus,
+  );
+
+  assert.equal(result.findings.length, 0);
+  assert.equal(result.rejected, 1);
+});
+
+test("resolveScope applies a confirmed clarification and records provenance", async () => {
+  let capturedInput = "";
+  const result = await resolveScope(
+    request(),
+    deps(generatedScope(true), [], (input) => {
+      capturedInput = input;
+    }),
+  );
+
+  assert.equal(capturedInput, TRANSCRIPT);
+  assert.equal(result.scope.requirements[0].status, "confirmed");
+  assert.equal(result.scope.requirements[0].sourceKind, "clarification");
+  assert.equal(result.scope.clarifications.length, 1);
+  assert.equal(result.scope.clarifications[0].confirmed, true);
+  assert.equal(result.scope.clarifications[0].question, QUESTION);
+  assert.equal(result.scope.clarifications[0].answer, CONFIRMED.answer);
+  assert.equal(result.comparison.questionResolved, true);
+});
+
+test("resolveScope keeps an unconfirmed clarification out of confirmed commitments", async () => {
+  const result = await resolveScope(
+    request({ confirmed: false }),
+    deps(generatedScope(false)),
+  );
+
+  assert.equal(result.scope.requirements[0].status, "proposed");
+  assert.equal(result.scope.clarifications[0].confirmed, false);
+  assert.match(
+    result.scope.clarifications[0].answer,
+    /every Monday/,
+  );
+});
+
+test("resolveScope preserves existing clarifications and unrelated commitments", async () => {
+  const existing: Clarification = {
+    id: "old",
+    question: "Who needs access?",
+    answer: "Only managers.",
+    confirmed: true,
+  };
+  const base = scope({ clarifications: [existing] });
+  const generated = generatedScope(true);
+  generated.clarifications = [existing, CONFIRMED];
+
+  const result = await resolveScope(
+    request({ scope: base }),
+    deps(generated),
+  );
+
+  assert.equal(result.scope.clarifications.length, 2);
+  assert.equal(result.scope.clarifications[0].id, "old");
+  assert.equal(result.scope.inScope[0].status, "confirmed");
+  assert.equal(result.scope.inScope[0].sourceKind, "transcript");
+});
+
+test("resolveScope rejects a question that is not open", async () => {
+  await assert.rejects(
+    () =>
+      resolveScope(
+        request({ question: "What is the budget?" }),
+        deps(generatedScope(true)),
+      ),
+    (error: unknown) =>
+      error instanceof ResolveInputError &&
+      /not open in the current scope/.test(error.message),
+  );
+});
+
+test("resolveRequestSchema rejects empty and whitespace answers", () => {
+  assert.equal(
+    resolveRequestSchema.safeParse(request({ answer: "" })).success,
+    false,
+  );
+  assert.equal(
+    resolveRequestSchema.safeParse(request({ answer: "   " })).success,
+    false,
+  );
+  assert.equal(
+    resolveRequestSchema.safeParse(request({ input: "   " })).success,
+    false,
+  );
+});
+
+test("resolveScope propagates model failures without mutating the request", async () => {
+  const base = request();
+  const snapshot = JSON.parse(JSON.stringify(base));
+
+  await assert.rejects(
+    () =>
+      resolveScope(base, {
+        generateScope: async () => {
+          throw new Error("provider unavailable");
+        },
+        critiqueScope: async () => [],
+        newClarificationId: () => "c1",
+      }),
+    /provider unavailable/,
+  );
+
+  assert.deepEqual(base, snapshot);
+});
+
+test("resolveScope reports resolved, retained, and new findings", async () => {
+  const oldFinding = finding("The report delivery time is undefined.");
+  const retained = finding(
+    "Client access conflicts with the security policy.",
+    "We need a dashboard for the team",
+  );
+  const newFinding = finding(
+    "The clarification did not define report contents.",
+    "every Monday at 8 AM",
+  );
+
+  const generated = generatedScope(true);
+  const result = await resolveScope(
+    request({ findings: [oldFinding, retained] }),
+    deps(generated, [retained, newFinding]),
+  );
+
+  assert.deepEqual(result.comparison.findings.resolved, [oldFinding]);
+  assert.deepEqual(result.comparison.findings.remaining, [
+    { ...retained, sourceKind: "transcript" },
+  ]);
+  assert.deepEqual(result.comparison.findings.added, [
+    {
+      ...newFinding,
+      sourceKind: "clarification",
+      clarificationId: "c1",
+    },
+  ]);
+});
+
+test("the original transcript string is never rewritten", () => {
+  const original = "  Transcript with leading and trailing spaces.  ";
+  const corpus = { transcript: original, clarifications: [CONFIRMED] };
+
+  repairScopeProvenance(generatedScope(true), corpus);
+
+  assert.equal(corpus.transcript, original);
+});
+test("resolveScope blocks unrelated promotions to confirmed", async () => {
+  const unrelated = "The dashboard must also be available in French.";
+  const supportedText = "The report must be ready before the Monday meeting.";
+
+  const base = scope({
+    requirements: [
+      {
+        text: unrelated,
+        status: "proposed",
+        rationale: "No language requirement was stated.",
+      },
+      {
+        text: supportedText,
+        status: "proposed",
+        rationale: "No delivery time was stated.",
+      },
+    ],
+  });
+
+  const generated = generatedScope(true);
+  generated.requirements = [
+    {
+      text: unrelated,
+      status: "confirmed",
+      sourceQuote: "We need a dashboard for the team",
+    },
+    ...generated.requirements,
+  ];
+
+  const result = await resolveScope(request({ scope: base }), deps(generated));
+
+  const unrelatedItem = result.scope.requirements.find(
+    (item) => item.text === unrelated,
+  );
+  const supportedItem = result.scope.requirements.find(
+    (item) => item.text === supportedText,
+  );
+
+  assert.equal(unrelatedItem?.status, "proposed");
+  assert.match(unrelatedItem?.rationale ?? "", /client-confirmed clarification/i);
+  assert.equal(supportedItem?.status, "confirmed");
+  assert.equal(supportedItem?.sourceKind, "clarification");
+});
+
+test("resolveScope passes the current edited scope to the generator", async () => {
+  const edited = scope({
+    problemStatement: "A manually edited problem statement.",
+  });
+  let received: Scope | undefined;
+
+  await resolveScope(request({ scope: edited }), {
+    generateScope: async (_input, options) => {
+      received = options?.currentScope;
+      return generatedScope(true);
+    },
+    critiqueScope: async () => [],
+    newClarificationId: () => "c1",
+  });
+
+  assert.equal(
+    received?.problemStatement,
+    "A manually edited problem statement.",
+  );
+});
+
+test("a critique failure after generation does not mutate the request", async () => {
+  const base = request();
+  const snapshot = JSON.parse(JSON.stringify(base));
+
+  await assert.rejects(
+    () =>
+      resolveScope(base, {
+        generateScope: async () => generatedScope(true),
+        critiqueScope: async () => {
+          throw new Error("critique provider failed");
+        },
+        newClarificationId: () => "c1",
+      }),
+    /critique provider failed/,
+  );
+
+  assert.deepEqual(base, snapshot);
+});
+
+test("an existing unconfirmed clarification cannot promote a proposal", async () => {
+  const oldUnconfirmed: Clarification = {
+    id: "old",
+    question: "When could the report be ready?",
+    answer: "Maybe Monday morning.",
+    confirmed: false,
+  };
+
+  const base = scope({ clarifications: [oldUnconfirmed] });
+  const generated = generatedScope(true);
+  generated.requirements = [
+    {
+      text: "The report must be ready before the Monday meeting.",
+      status: "confirmed",
+      sourceQuote: "Maybe Monday morning",
+    },
+  ];
+
+  const result = await resolveScope(
+    request({ scope: base, confirmed: true }),
+    deps(generated),
+  );
+
+  assert.equal(result.scope.requirements[0].status, "proposed");
+  assert.match(
+    result.scope.requirements[0].rationale ?? "",
+    /unconfirmed/i,
+  );
+});
