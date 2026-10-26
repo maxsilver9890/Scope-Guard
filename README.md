@@ -256,3 +256,55 @@ Invalid requests return `400` with a concise error. Provider failures return `50
 - `samples/vague-feature-request.txt` — a short, vague feature request.
 
 These are stable regression inputs for the analysis and critique passes.
+## Product Update — Audio Intake and PDF Export
+
+*Implementation update: October 2026. This addendum records the current product behavior; earlier feature summaries and verification counts above describe an earlier snapshot and are retained for history.*
+
+### Three ways to provide source material
+
+The source panel now offers three input modes:
+
+- **Paste Text** — paste a discovery transcript, meeting notes, or a rough project brief.
+- **Record Conversation** — grant microphone access, record in the browser, and stop to transcribe. The interface shows recording status and elapsed time, and provides Stop and Cancel controls.
+- **Upload Recording** — choose an existing audio file and transcribe it.
+
+Both audio modes put the returned transcript into the same editable source field used by Paste Text. Review and edit the transcript, then explicitly select **Analyze**. Audio does not use a separate scope-generation or critique pipeline: analysis still submits text to `POST /api/analyze` and runs the existing generation, validation, provenance, and critique steps.
+
+The recorder feature uses browser `MediaRecorder` and checks supported MIME types at runtime. Microphone access requires browser permission and a secure context (HTTPS; `localhost` is supported). Canceling a recording stops its microphone tracks. Transcription requests can be canceled; duplicate requests are blocked. If transcription fails, the current source text and displayed scope results remain available, and the selected recording can be retried.
+
+### Transcription, privacy, and limits
+
+Audio is submitted to the server-side `POST /api/transcribe` route and forwarded to OpenRouter's dedicated transcription endpoint with `openai/gpt-transcribe`. The existing OpenRouter API key stays on the server. The configured scope-analysis model is not changed; transcription uses the separate `OPENROUTER_TRANSCRIPTION_MODEL` setting.
+
+Supported upload extensions are MP3, M4A/MP4, WAV, WebM, OGG, FLAC, and AAC. The server enforces a 4 MiB audio-file limit and bounds the full multipart request before parsing. Recordings stop at 15 minutes and request a 32 kbps audio bitrate; browser encoders can vary, so the 4 MiB limit still applies. An oversized recording can be downloaded from the page so it can be shortened or compressed before retrying. Uploaded files have no separate decoded-duration limit: their size is capped, and the transcription request has a 55-second provider timeout.
+
+Recordings are held in browser memory until transcription is requested. Scope Guard does not write audio to persistent storage or log audio contents, full transcripts, or API keys. When transcription is requested, audio is sent over HTTPS to Scope Guard's server and then to OpenRouter and its selected model provider; provider data handling and retention terms may vary. The recording interface reminds users to obtain the other participants' knowledge and consent before recording.
+
+The deployment target is not declared in this repository. The 4 MiB file cap leaves headroom under Vercel Functions' documented 4.5 MB request-body limit, but the production host and plan should be checked before raising limits. Long-recording chunking and persistent audio storage are not implemented.
+
+OpenRouter currently lists GPT Transcribe at **$0.000075 per second ($0.0045 per minute)**. For example, a 15-minute transcription is approximately $0.0675 at that listed rate. Pricing can change; see the [current model listing](https://openrouter.ai/openai/gpt-transcribe). This transcription model is usage-priced; it is separate from the configured free analysis model.
+
+### Client-shareable PDF export
+
+The primary document export is **Download PDF**. It builds a paginated PDF from the current edited scope workspace, including commitment statuses, findings and source evidence, clarifications, and an available change comparison. The document includes a cover, a generated table of contents, section navigation, page numbers, and a restrained footer. Generation uses `pdfmake` in the client and does not send scope content to a PDF service. Markdown is no longer offered as a separate export action in the current UI.
+
+### Configuration
+
+Copy `.env.example` to `.env.local`, add the server-side OpenRouter key, and keep the OpenRouter base URL. Preserve the current analysis model. Set the transcription model separately:
+
+```ini
+DEEPSEEK_API_KEY=<your OpenRouter key>
+DEEPSEEK_BASE_URL=https://openrouter.ai/api/v1
+DEEPSEEK_MODEL=dots-studio/dots-3-note-preview:free
+OPENROUTER_TRANSCRIPTION_MODEL=openai/gpt-transcribe
+```
+
+`OPENROUTER_TRANSCRIPTION_MODEL` defaults to `openai/gpt-transcribe` in the server adapter if omitted. Never put the API key in client code or commit `.env.local`.
+
+### Current verification
+
+The current automated suite contains **83 passing tests**. `npm test`, `npx tsc --noEmit`, `npx eslint src tests`, and `npm run build` pass. Transcription route success, timeout, validation, and provider-error cases use mocked responses; no usage-billed live transcription request was made. Manual browser checks for microphone permissions, browser-specific recording formats, file uploads, and live OpenRouter transcription remain to be completed.
+
+### Snapshot clarification
+
+The original overview above is retained as requested and predates these updates. In particular, its **57 tests**, **Export Markdown**, and **no live call capture** statements are historical: the current suite has 83 tests, the current primary export is **Download PDF**, and the current app can record a conversation in the browser and transcribe it after Stop. It does not provide real-time transcription while a conversation is in progress.

@@ -3,12 +3,11 @@
 import {
   useEffect,
   useState,
-  type FormEvent,
-  type KeyboardEvent,
   type ReactNode,
 } from "react";
 
-import { scopeToMarkdown } from "@/lib/markdown";
+import { downloadScopePdf } from "@/lib/pdf-export";
+import { ScopeInput } from "@/components/scope-input";
 import {
   isScopeComparison,
   SECTION_LABELS,
@@ -1197,15 +1196,13 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await runAnalysis();
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      void runAnalysis();
+  function handleInputChange(value: string) {
+    setInput(value);
+    if (status === "success" || status === "error") {
+      setStatus("idle");
+    }
+    if (error) {
+      setError(null);
     }
   }
 
@@ -1233,24 +1230,13 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     applyScopeEdit(next);
   }
 
-  function handleExport() {
+  async function handleExport() {
     if (!editedScope || !findings) {
       return;
     }
 
     try {
-      const { filename, content } = scopeToMarkdown(editedScope, findings, {
-        edited: isEdited,
-      });
-      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      await downloadScopePdf(editedScope, findings, comparison);
       setExportStatus("success");
     } catch {
       setExportStatus("error");
@@ -1389,105 +1375,16 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="px-5 pb-5 pt-5 sm:px-6">
-            <div className="flex items-baseline justify-between gap-3">
-              <label
-                htmlFor="source-input"
-                className="text-[10px] font-medium uppercase tracking-[0.16em] text-forest/70"
-              >
-                Source material
-              </label>
-              <span className="font-mono text-[10px] tabular-nums text-muted/80">
-                {input.length.toLocaleString("en-US")} characters
-              </span>
-            </div>
-
-            <textarea
-              id="source-input"
-              name="source"
-              value={input}
-              onChange={(event) => {
-                setInput(event.target.value);
-                if (status === "success" || status === "error") {
-                  setStatus("idle");
-                }
-                if (error) {
-                  setError(null);
-                }
-              }}
-              onKeyDown={handleKeyDown}
-              rows={16}
-              spellCheck={false}
-              placeholder="Paste a discovery transcript, meeting notes, or a rough project brief…"
-              aria-describedby="source-helper"
-              className="mt-2.5 block max-h-[70vh] min-h-[380px] w-full resize-y rounded-md border border-line bg-white px-4 py-3.5 font-sans text-[13px] leading-[1.75] text-ink/90 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-colors duration-200 placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
-            />
-
-            <div
-              id="source-helper"
-              className="mt-2.5 flex items-center gap-2 text-[11px] text-muted"
-            >
-              <span
-                aria-hidden="true"
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`}
-              />
-              <span>Source brief · {sourceStatus}</span>
-            </div>
-
-            <button
-              type="submit"
-              disabled={
-                isAnalyzing || isResolving || input.trim().length === 0
-              }
-              aria-busy={isAnalyzing}
-              className="group mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-accent px-5 text-[13px] font-medium tracking-[0.01em] text-white shadow-[0_1px_2px_rgba(79,70,229,0.3),0_10px_24px_-14px_rgba(79,70,229,0.7)] transition-colors duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-accent/45 disabled:text-white/80"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Spinner className="h-4 w-4" />
-                  Analyzing brief…
-                </>
-              ) : (
-                <>
-                  Analyze
-                  <AnalyzeArrow />
-                </>
-              )}
-            </button>
-
-            {error ? (
-              <div
-                role="alert"
-                className="mt-3.5 flex items-start gap-2.5 rounded-md border border-rose-200 bg-rose-50 px-3.5 py-3 text-[12px] leading-5 text-rose-800"
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  aria-hidden="true"
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                >
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6.25"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                  />
-                  <path
-                    d="M8 4.8v3.8M8 11.1v.1"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <p>{error}</p>
-              </div>
-            ) : null}
-
-            <p className="mt-3 text-center text-[10.5px] leading-5 text-muted/80">
-              One extraction pass · One Scope Guard review
-            </p>
-          </form>
+          <ScopeInput
+            input={input}
+            onInputChange={handleInputChange}
+            onAnalyze={() => void runAnalysis()}
+            analysisError={error}
+            isAnalyzing={isAnalyzing}
+            isResolving={isResolving}
+            statusDot={statusDot}
+            sourceStatus={sourceStatus}
+          />
         </div>
       </aside>
 
@@ -1592,7 +1489,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                       className={TOOLBAR_PRIMARY}
                     >
                       <DownloadIcon />
-                      Export Markdown
+                      Download PDF
                     </button>
                   </div>
                   <p
@@ -1605,7 +1502,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     }`}
                   >
                     {exportStatus === "success"
-                      ? "Markdown downloaded."
+                      ? "PDF downloaded."
                       : exportStatus === "error"
                         ? "Export failed. Try again."
                         : ""}
