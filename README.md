@@ -256,6 +256,20 @@ Invalid requests return `400` with a concise error. Provider failures return `50
 - `samples/vague-feature-request.txt` — a short, vague feature request.
 
 These are stable regression inputs for the analysis and critique passes.
+
+## Source-input UX update — October 2026
+
+The source panel keeps **Paste Text**, **Record Conversation**, and **Upload Recording** as separate ways to enter source material, while all three use the same editable source-text field. Each mode explains how its input reaches that field. Users can also type or paste text while Record or Upload is selected; audio is optional when source text is already present.
+
+The field is labeled **FINAL SOURCE MATERIAL / TRANSCRIPT** and explains that this is the text Scope Guard analyzes. Users can edit a transcript or combine it with written context before analysis. Empty or whitespace-only text cannot be analyzed, and the interface explains what to add.
+
+Recording and uploaded audio use the existing transcription request. When transcription succeeds, an empty source field is populated automatically. If the field already contains text, Scope Guard asks the user to **Replace existing text**, **Append transcript**, or **Cancel**. Appending preserves the current text and inserts a blank line before the transcript. Canceling or a transcription failure leaves the source text unchanged. Transcription never starts scope analysis; the user must select **Analyze** after reviewing the source field.
+
+### Latest automated verification
+
+This snapshot supersedes the earlier test counts above: `npm test` reports **106 passing tests**. `npx tsc --noEmit`, `npx eslint src tests`, and `npm run build` also pass. The source-text tests cover empty-field transcription, protected existing text, replace/append/cancel, failure preservation, blank-text validation, and text changes made while transcription is running.
+
+Desktop and mobile browser inspection was not completed in the implementation environment. Responsive layout and the dialog still need a manual visual check.
 ## Product Update — Audio Intake and PDF Export
 
 *Implementation update: October 2026. This addendum records the current product behavior; earlier feature summaries and verification counts above describe an earlier snapshot and are retained for history.*
@@ -308,3 +322,7 @@ The current automated suite contains **83 passing tests**. `npm test`, `npx tsc 
 ### Snapshot clarification
 
 The original overview above is retained as requested and predates these updates. In particular, its **57 tests**, **Export Markdown**, and **no live call capture** statements are historical: the current suite has 83 tests, the current primary export is **Download PDF**, and the current app can record a conversation in the browser and transcribe it after Stop. It does not provide real-time transcription while a conversation is in progress.
+
+## Latest verification update — October 2026
+
+The source-input UX addendum above describes the current three-mode workflow. This snapshot supersedes the earlier test counts: `npm test` reports **106 passing tests**. `npx tsc --noEmit`, `npx eslint src tests`, and `npm run build` also passed for this implementation. Desktop and mobile browser inspection was not completed; manual responsive UI review remains outstanding.

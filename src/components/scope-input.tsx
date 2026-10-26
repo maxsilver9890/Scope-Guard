@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { isSourceTextAnalyzable, resolveTranscriptHandoff, transcribeAndPrepareHandoff, type TranscriptChoice } from "@/lib/source-text";
 
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 const MAX_RECORDING_MS = 15 * 60 * 1000;
@@ -23,6 +24,12 @@ const MODES: { id: InputMode; label: string }[] = [
   { id: "record", label: "Record Conversation" },
   { id: "upload", label: "Upload Recording" },
 ];
+
+const MODE_DESCRIPTIONS: Record<InputMode, string> = {
+  paste: "Paste a discovery-call transcript, client brief, or project requirements. You can edit the text before analyzing.",
+  record: "Record a conversation and transcribe it into the source text below. Review and edit the transcript before analyzing.",
+  upload: "Upload an audio recording to transcribe it into the source text below. Review and edit the transcript before analyzing.",
+};
 
 function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -66,11 +73,12 @@ export function ScopeInput({
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptReady, setTranscriptReady] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [transcriptionNotice, setTranscriptionNotice] = useState<string | null>(null);
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
   const [transcriptionCancelled, setTranscriptionCancelled] = useState(false);
   const [lastTranscribedFile, setLastTranscribedFile] = useState<File | null>(null);
+  const inputRef = useRef(input);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -78,6 +86,15 @@ export function ScopeInput({
   const inFlightRef = useRef(false);
   const requestRef = useRef<AbortController | null>(null);
   const startedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
+
+  function updateInputText(value: string) {
+    inputRef.current = value;
+    onInputChange(value);
+  }
 
   function stopTracks() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -111,6 +128,18 @@ export function ScopeInput({
     requestRef.current?.abort();
   }, []);
 
+  useEffect(() => {
+    if (pendingTranscript === null) return;
+    const dismissOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPendingTranscript(null);
+        setTranscriptionNotice("Transcript not applied. Your existing source text is unchanged.");
+      }
+    };
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => document.removeEventListener("keydown", dismissOnEscape);
+  }, [pendingTranscript]);
+
   async function transcribe(file: File) {
     if (inFlightRef.current) return;
     if (file.size > MAX_AUDIO_BYTES) {
@@ -122,6 +151,7 @@ export function ScopeInput({
     inFlightRef.current = true;
     setIsTranscribing(true);
     setLastTranscribedFile(file);
+    setPendingTranscript(null);
     setTranscriptionError(null);
     setTranscriptionNotice(null);
     setTranscriptionCancelled(false);
@@ -130,27 +160,38 @@ export function ScopeInput({
     const timeout = window.setTimeout(() => controller.abort(), 60_000);
 
     try {
-      const form = new FormData();
-      form.append("file", file, file.name);
-      const response = await fetch("/api/transcribe", {
-        method: "POST",
-        body: form,
-        signal: controller.signal,
-        cache: "no-store",
+      const handoff = await transcribeAndPrepareHandoff(() => inputRef.current, async () => {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        const response = await fetch("/api/transcribe", {
+          method: "POST",
+          body: form,
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        const payload: unknown = await response.json().catch(() => null);
+        if (!response.ok) {
+          const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+            ? payload.error
+            : "Transcription failed. Check the audio and retry.";
+          throw new Error(message);
+        }
+        if (typeof payload !== "object" || payload === null || !("text" in payload) || typeof payload.text !== "string" || !payload.text.trim()) {
+          throw new Error("The transcription response did not include any text. Retry or choose a clearer recording.");
+        }
+        return payload.text;
       });
-      const payload: unknown = await response.json().catch(() => null);
-      if (!response.ok) {
-        const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
-          ? payload.error
-          : "Transcription failed. Check the audio and retry.";
-        throw new Error(message);
+      if (handoff.kind === "error") throw handoff.error;
+      if (handoff.kind === "choose") {
+        setPendingTranscript(handoff.transcript);
+        return;
       }
-      if (typeof payload !== "object" || payload === null || !("text" in payload) || typeof payload.text !== "string" || !payload.text.trim()) {
-        throw new Error("The transcription response did not include any text. Retry or choose a clearer recording.");
+      if (handoff.kind === "apply") {
+        updateInputText(handoff.sourceText);
+        setTranscriptionNotice("Transcript ready. Review or edit it below, then choose Analyze.");
+      } else if (handoff.kind === "preserve") {
+        setTranscriptionError("The transcription did not include any text. Retry or choose a clearer recording.");
       }
-      onInputChange(payload.text.trim());
-      setTranscriptReady(true);
-      setTranscriptionNotice("Transcript ready. Review or edit it below, then choose Analyze.");
     } catch (error) {
       if (controller.signal.aborted) {
         setTranscriptionCancelled(true);
@@ -168,10 +209,21 @@ export function ScopeInput({
     }
   }
 
+  function chooseTranscript(choice: TranscriptChoice) {
+    if (pendingTranscript === null) return;
+    const handoff = resolveTranscriptHandoff(inputRef.current, pendingTranscript, choice);
+    if (handoff.kind === "apply") {
+      updateInputText(handoff.sourceText);
+      setTranscriptionNotice("Transcript ready. Review or edit it below, then choose Analyze.");
+    } else if (handoff.kind === "preserve") {
+      setTranscriptionNotice("Transcript not applied. Your existing source text is unchanged.");
+    }
+    setPendingTranscript(null);
+  }
+
   async function startRecording() {
     setTranscriptionError(null);
     setTranscriptionNotice(null);
-    setTranscriptReady(false);
     setRecordingFile(null);
     setTranscriptionCancelled(false);
     if (!window.isSecureContext) {
@@ -274,13 +326,11 @@ export function ScopeInput({
     setMode(nextMode);
     setTranscriptionError(null);
     setTranscriptionNotice(null);
-    setTranscriptReady(false);
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     setSelectedFile(file);
-    setTranscriptReady(false);
     setTranscriptionError(null);
     setTranscriptionNotice(null);
     setTranscriptionCancelled(false);
@@ -294,17 +344,19 @@ export function ScopeInput({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isSourceTextAnalyzable(input)) return;
     onAnalyze();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
+      if (!isSourceTextAnalyzable(input)) return;
       onAnalyze();
     }
   }
 
-  const canAnalyze = mode === "paste" || transcriptReady;
+  const canAnalyze = isSourceTextAnalyzable(input);
   const unsupportedRecordingBrowser = typeof window !== "undefined" &&
     (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined");
 
@@ -325,6 +377,10 @@ export function ScopeInput({
           </button>
         ))}
       </div>
+
+      <p className="mt-3 text-[11px] leading-5 text-muted" aria-live="polite">
+        {MODE_DESCRIPTIONS[mode]}
+      </p>
 
       {mode === "record" ? (
         <section className="mt-4 rounded-xl border border-line/70 bg-white/75 p-4" aria-labelledby="record-title">
@@ -373,27 +429,30 @@ export function ScopeInput({
       ) : null}
 
       <div className="mt-4 flex items-baseline justify-between gap-3">
-        <label htmlFor="source-input" className="text-[10px] font-medium uppercase tracking-[0.16em] text-forest/70">{transcriptReady ? "Transcript · review and edit" : "Source material / transcript"}</label>
+        <label htmlFor="source-input" className="text-[10px] font-medium uppercase tracking-[0.16em] text-forest/70">FINAL SOURCE MATERIAL / TRANSCRIPT</label>
         <span className="font-mono text-[10px] tabular-nums text-muted/80">{input.length.toLocaleString("en-US")} characters</span>
       </div>
       <textarea
         id="source-input"
         name="source"
         value={input}
-        onChange={(event) => onInputChange(event.target.value)}
+        onChange={(event) => updateInputText(event.target.value)}
         onKeyDown={handleKeyDown}
-        readOnly={isRecording || isTranscribing}
+        readOnly={pendingTranscript !== null}
         rows={16}
         spellCheck={false}
-        placeholder={mode === "paste" ? "Paste a discovery transcript, meeting notes, or a rough project brief…" : "Your existing source text will stay here until a transcription succeeds."}
-        aria-describedby="source-helper transcription-privacy"
+        placeholder={mode === "paste" ? "Paste a discovery transcript, meeting notes, or a rough project brief…" : "Transcribe a recording or add written context here…"}
+        aria-describedby={`source-helper source-text-helper transcription-privacy${canAnalyze ? "" : " source-empty-message"}`}
         className="mt-2.5 block max-h-[70vh] min-h-[300px] w-full resize-y rounded-md border border-line bg-white px-4 py-3.5 font-sans text-[13px] leading-[1.75] text-ink/90 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-colors duration-200 placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft sm:min-h-[380px]"
       />
 
-      <div id="source-helper" className="mt-2.5 flex items-center gap-2 text-[11px] text-muted">
+      <p id="source-helper" className="mt-2.5 flex items-center gap-2 text-[11px] text-muted">
         <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
         <span>Source brief · {sourceStatus}</span>
-      </div>
+      </p>
+      <p id="source-text-helper" className="mt-2 text-[11px] leading-5 text-muted">
+        This is the text Scope Guard will analyze. You can edit the transcript or add relevant written context before analyzing.
+      </p>
 
       {isTranscribing ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-3 text-[11px] text-sky-900" role="status" aria-live="polite">
@@ -408,9 +467,57 @@ export function ScopeInput({
 
       {mode !== "paste" ? <p id="transcription-privacy" className="mt-3 rounded-md bg-slate-50 px-3 py-2.5 text-[10px] leading-5 text-muted">When you transcribe, the audio is sent securely to Scope Guard’s server and forwarded to OpenRouter and its transcription provider. Audio is not stored by Scope Guard after the request. Provider retention may vary. Use recordings only with participants’ knowledge and consent.</p> : <span id="transcription-privacy" className="sr-only">Text is sent to Scope Guard for analysis only when Analyze is selected.</span>}
 
+      {pendingTranscript !== null ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) chooseTranscript("cancel");
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="transcript-choice-title"
+            aria-describedby="transcript-choice-description"
+            className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-2xl"
+          >
+            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
+              Transcription complete
+            </p>
+            <h2 id="transcript-choice-title" className="mt-2 font-serif text-2xl leading-tight text-forest">
+              How should we use this transcript?
+            </h2>
+            <p id="transcript-choice-description" className="mt-3 text-[13px] leading-6 text-muted">
+              Replacing discards the existing text in the source field. Appending combines the existing text and transcript for analysis.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => chooseTranscript("cancel")} className="inline-flex h-9 items-center rounded-md border border-line bg-surface px-3.5 text-[11px] font-medium text-forest transition-colors hover:border-forest/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+                Cancel
+              </button>
+              <button type="button" onClick={() => chooseTranscript("append")} className="inline-flex h-9 items-center rounded-md border border-line bg-white px-3.5 text-[11px] font-medium text-forest transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+                Append transcript
+              </button>
+              <button type="button" onClick={() => chooseTranscript("replace")} className="inline-flex h-9 items-center rounded-md bg-accent px-3.5 text-[11px] font-medium text-white transition-colors hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+                Replace existing text
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {!canAnalyze ? (
+        <p id="source-empty-message" role="status" aria-live="polite" className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[11px] leading-5 text-amber-900">
+          Add source text before analyzing. You can paste text, or transcribe a recording into this field.
+        </p>
+      ) : null}
+
+      <p className="mt-4 text-center text-[10.5px] leading-5 text-muted/80">
+        Scope Guard analyzes the text in the source field below.
+      </p>
+
       <button
         type="submit"
-        disabled={isAnalyzing || isResolving || isTranscribing || input.trim().length === 0 || !canAnalyze}
+        disabled={isAnalyzing || isResolving || isTranscribing || !canAnalyze}
         aria-busy={isAnalyzing}
         className="group mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-accent px-5 text-[13px] font-medium tracking-[0.01em] text-white shadow-[0_1px_2px_rgba(79,70,229,0.3),0_10px_24px_-14px_rgba(79,70,229,0.7)] transition-colors duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-accent/45 disabled:text-white/80"
       >
