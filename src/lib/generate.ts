@@ -52,7 +52,9 @@ const CLARIFICATION_RULES = `A CLIENT CLARIFICATIONS block may be present. It is
 Clarification rules:
 - An answer labelled "CONFIRMED BY CLIENT" is client-confirmed source material. You may mark an item confirmed only when its sourceQuote is copied verbatim from that answer. Never upgrade unrelated items.
 - An answer labelled "UNCONFIRMED NOTE" is not client agreement. Never mark an item based on it as confirmed; use proposed or inferred with a rationale.
+- When an answer changes an existing decision, update or remove the affected item in the appropriate main scope section. Do not leave a stale exclusion or requirement beside the new decision. Keep a remaining partial decision as an open question.
 - Apply only what the answer actually resolves. Preserve unrelated confirmed items, exclusions, assumptions, and open questions.
+- Preserve every direct client commitment from the transcript unless a later client-confirmed clarification explicitly changes it. Do not leave a directly confirmed item as proposed just because other details remain undecided.
 - Remove the selected open question only if the clarification fully resolves it. If the answer only partly resolves it, keep the remaining uncertainty as an open question.
 - A CURRENT SCOPE DOCUMENT may be supplied as context and may contain manual edits. Preserve unrelated wording and decisions; change only what the clarification requires. Do not silently upgrade unrelated requirements.
 - sourceQuote may come from the original transcript or a clarification answer, but it must be a verbatim substring of that source. Never invent a quote.`;

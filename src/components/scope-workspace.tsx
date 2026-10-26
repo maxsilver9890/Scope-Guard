@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { downloadScopePdf } from "@/lib/pdf-export";
+import { getPdfExportPreflight } from "@/lib/clarifications";
 import { ScopeInput } from "@/components/scope-input";
 import {
   isScopeComparison,
@@ -1041,6 +1042,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
+  const [pdfWarningOpen, setPdfWarningOpen] = useState(false);
   const [analyzedInput, setAnalyzedInput] = useState<string | null>(null);
   const [resolveTarget, setResolveTarget] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
@@ -1052,6 +1054,9 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     scope !== null && editedScope !== null && findings !== null;
   const statusCounts =
     hasResults && editedScope ? countStatuses(editedScope) : null;
+  const pdfPreflight = editedScope
+    ? getPdfExportPreflight(editedScope)
+    : { requiresConfirmation: false, count: 0 };
 
   const navItems: NavItem[] =
     hasResults && editedScope
@@ -1101,6 +1106,21 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     }
     scrollToSection("changes");
   }, [comparisonKey]);
+
+  useEffect(() => {
+    if (!pdfWarningOpen) {
+      return;
+    }
+
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPdfWarningOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => document.removeEventListener("keydown", dismissOnEscape);
+  }, [pdfWarningOpen]);
 
   const sourceStatus =
     status === "loading"
@@ -1230,7 +1250,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     applyScopeEdit(next);
   }
 
-  async function handleExport() {
+  async function exportCurrentPdf() {
     if (!editedScope || !findings || exportStatus === "loading") {
       return;
     }
@@ -1242,6 +1262,31 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     } catch {
       setExportStatus("error");
     }
+  }
+
+  function handleExport() {
+    if (!editedScope || !findings || exportStatus === "loading") {
+      return;
+    }
+
+    if (pdfPreflight.requiresConfirmation) {
+      setPdfWarningOpen(true);
+      return;
+    }
+
+    void exportCurrentPdf();
+  }
+
+  function handleResolveQuestionsFromWarning() {
+    const firstQuestion = pdfPreflight.firstQuestion;
+    setPdfWarningOpen(false);
+    if (!firstQuestion) {
+      return;
+    }
+
+    setResolveTarget(firstQuestion.text);
+    setResolveError(null);
+    window.requestAnimationFrame(() => scrollToSection("open-questions"));
   }
 
   async function handleResolve(submission: ResolveSubmission) {
@@ -1266,6 +1311,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
         body: JSON.stringify({
           input: analyzedInput,
           scope: editedScope,
+          baseScope: scope ?? editedScope,
           findings,
           question: resolveTarget,
           answer: submission.answer,
@@ -1324,6 +1370,67 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
 
   return (
     <section aria-label="Scoping analysis workspace" className="mt-6 lg:mt-8">
+      {pdfWarningOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setPdfWarningOpen(false);
+            }
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="pdf-pending-questions-title"
+            aria-describedby="pdf-pending-questions-description"
+            className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-2xl"
+          >
+            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+              Before you export
+            </p>
+            <h2
+              id="pdf-pending-questions-title"
+              className="mt-2 font-serif text-2xl leading-tight text-forest"
+            >
+              {pdfPreflight.count} unanswered {pdfPreflight.count === 1 ? "question" : "questions"}
+            </h2>
+            <p
+              id="pdf-pending-questions-description"
+              className="mt-3 text-[13px] leading-6 text-muted"
+            >
+              Resolving these questions may produce a more complete and accurate scope document. You can answer them now or download the current scope with the open questions included.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPdfWarningOpen(false)}
+                className={TOOLBAR_BUTTON}
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={handleResolveQuestionsFromWarning}
+                className={TOOLBAR_BUTTON}
+              >
+                Resolve Questions
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPdfWarningOpen(false);
+                  void exportCurrentPdf();
+                }}
+                className={TOOLBAR_PRIMARY}
+              >
+                Download Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {hasSidebar ? (
         <ScopeNav
           variant="bar"

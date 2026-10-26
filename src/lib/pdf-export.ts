@@ -1,5 +1,5 @@
 import type { TDocumentDefinitions, Content } from "pdfmake/interfaces";
-import type { ScopeComparison } from "./diff";
+import { questionStillOpen, type ScopeComparison } from "./diff";
 import type { Clarification, CommitmentStatus, Finding, Scope, ScopeItem } from "./schema";
 
 const statusLabels: Record<CommitmentStatus, string> = {
@@ -106,7 +106,8 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
   add("Potential Delivery Risks", "delivery-risks", findings.length ? findings.map((finding, i) => findingContent(finding, i, clarifications)) : [{ text: "No findings were returned by the review.", italics: true, color: "#687386", fontSize: 9 }]);
   add("Client Clarifications", "client-clarifications", clarifications.length ? clarifications.flatMap((entry, i) => [
     { text: `${i + 1}. ${entry.question}`, bold: true, fontSize: 9.5, color: "#1b2440", margin: [0, 5, 0, 3], keepWithNext: true },
-    { text: entry.confirmed ? "Confirmed by client" : "Unconfirmed note", color: entry.confirmed ? "#18704f" : "#95631b", bold: true, fontSize: 8, margin: [0, 0, 0, 3] },
+    { text: entry.confirmed ? "Client-confirmed answer" : "Unconfirmed note", color: entry.confirmed ? "#18704f" : "#95631b", bold: true, fontSize: 8, margin: [0, 0, 0, 2], keepWithNext: true },
+    { text: questionStillOpen(scope, entry.question) ? "Current scope: question remains open" : "Current scope: question is no longer listed as open", color: "#64748b", fontSize: 7.5, margin: [0, 0, 0, 3], keepWithNext: true },
     { text: [{ text: "Answer  ", bold: true }, entry.answer], fontSize: 9, color: "#263148", margin: [0, 0, 0, 8], lineHeight: 1.2 },
   ] as Content[]) : [{ text: "None recorded.", italics: true, color: "#687386", fontSize: 9 }]);
   if (comparison) add("Change Summary", "change-summary", changeContent(comparison));

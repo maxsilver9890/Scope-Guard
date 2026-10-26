@@ -30,6 +30,8 @@ export const resolveRequestSchema = z.object({
       message: "Source transcript is required.",
     }),
   scope: scopeSchema,
+  /** Unedited scope snapshot used to detect manual changes before regeneration. */
+  baseScope: scopeSchema.optional(),
   findings: z.array(findingSchema).default([]),
   question: z.string().trim().min(1).max(2_000),
   answer: z.string().trim().min(1).max(10_000),
@@ -122,6 +124,60 @@ function findPreviousItem(
   return bestScore >= 0.8 ? best : undefined;
 }
 
+const COMMITMENT_SECTIONS: CommitmentSectionKey[] = [
+  "inScope",
+  "outOfScope",
+  "requirements",
+  "acceptanceCriteria",
+];
+
+/**
+ * Keep a previously source-verified client commitment unless the latest
+ * confirmed clarification produced a related, clarification-sourced update.
+ */
+function preserveConfirmedCommitments(
+  previous: Pick<Scope, CommitmentSectionKey>,
+  generated: Scope,
+  clarification: Clarification,
+): Scope {
+  const next = { ...generated };
+
+  for (const section of COMMITMENT_SECTIONS) {
+    const items = [...next[section]];
+    for (const previousItem of previous[section]) {
+      if (previousItem.status !== "confirmed") continue;
+
+      const matches = COMMITMENT_SECTIONS.flatMap((key) => next[key]).filter(
+        (candidate) => similarity(previousItem.text, candidate.text) > 0,
+      );
+      const explicitlyUpdated =
+        clarification.confirmed &&
+        matches.some(
+          (candidate) =>
+            candidate.sourceKind === "clarification" &&
+            candidate.clarificationId === clarification.id &&
+            [candidate.text, candidate.sourceQuote ?? "", clarification.question].some(
+              (context) => similarity(previousItem.text, context) > 0,
+            ),
+        );
+
+      if (explicitlyUpdated) continue;
+
+      const existingIndex = items.findIndex(
+        (candidate) => similarity(previousItem.text, candidate.text) >= 0.55,
+      );
+      if (existingIndex >= 0) {
+        items[existingIndex] = previousItem;
+      } else {
+        items.push(previousItem);
+      }
+    }
+    next[section] = items;
+  }
+
+  return next;
+}
+
 /**
  * A proposal or inference cannot silently become a confirmed commitment just
  * because the model re-emitted it. Promotion requires evidence from a
@@ -198,6 +254,16 @@ export async function resolveScope(
     );
   }
 
+  if (
+    data.baseScope &&
+    JSON.stringify(data.scope) !== JSON.stringify(data.baseScope) &&
+    data.acknowledgeEdits !== true
+  ) {
+    throw new ResolveInputError(
+      "The scope contains manual edits. Acknowledge replacing them before applying this clarification.",
+    );
+  }
+
   const deps: ResolveDependencies = {
     generateScope,
     critiqueScope,
@@ -235,8 +301,17 @@ export async function resolveScope(
     );
   }
 
+  const trustedPreviousScope = repairScopeProvenance(
+    data.baseScope ?? data.scope,
+    corpus,
+  ).scope;
+  const preserved = preserveConfirmedCommitments(
+    trustedPreviousScope,
+    promoted.scope,
+    clarification,
+  );
   const candidate = {
-    ...promoted.scope,
+    ...repairScopeProvenance(preserved, corpus).scope,
     clarifications,
   };
   const verified = scopeSchema.safeParse(candidate);

@@ -195,6 +195,132 @@ test("resolveScope applies a confirmed clarification and records provenance", as
   assert.equal(result.comparison.questionResolved, true);
 });
 
+test("a confirmed answer updates the main scope and removes the stale exclusion", async () => {
+  const question = "Should online payments be included?";
+  const answer = "The client confirmed online payments are required.";
+  const source = `${TRANSCRIPT}\nDana: Online payments are still undecided.`;
+  const before = scope({
+    outOfScope: [
+      {
+        text: "Online payments are excluded from the initial scope.",
+        status: "proposed",
+        rationale: "The client has not decided whether to include payments.",
+      },
+    ],
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const next = {
+    ...scope({ openQuestions: [] }),
+    inScope: [
+      {
+        text: "Online payments are available.",
+        status: "confirmed" as const,
+        sourceQuote: answer,
+      },
+    ],
+    requirements: [
+      {
+        text: "Support online payments.",
+        status: "confirmed" as const,
+        sourceQuote: answer,
+      },
+    ],
+  };
+  let inputUsed = "";
+  const result = await resolveScope(
+    request({
+      input: source,
+      scope: before,
+      question,
+      answer,
+      confirmed: true,
+      findings: [
+        finding(
+          "Online payments were incorrectly classified as excluded.",
+          "Online payments are still undecided.",
+        ),
+      ],
+    }),
+    deps(next, [], (input) => {
+      inputUsed = input;
+    }),
+  );
+
+  assert.equal(result.scope.inScope[0].status, "confirmed");
+  assert.equal(result.scope.inScope[0].sourceKind, "clarification");
+  assert.equal(result.scope.outOfScope.length, 0);
+  assert.equal(result.scope.openQuestions.length, 0);
+  assert.equal(result.scope.clarifications[0].answer, answer);
+  assert.equal(result.scope.clarifications[0].confirmed, true);
+  assert.equal(result.findings.length, 0);
+  assert.equal(result.comparison.findings.resolved.length, 1);
+  assert.equal(inputUsed, source);
+});
+
+test("a clarification does not downgrade a directly confirmed unrelated commitment", async () => {
+  const item = {
+    text: "The course catalog includes client-provided testimonials.",
+    status: "confirmed" as const,
+    sourceQuote: "We will provide testimonials.",
+  };
+  const input = `${TRANSCRIPT}\nDana: We will provide testimonials.`;
+  const before = scope({
+    inScope: [scope().inScope[0], item],
+    openQuestions: [{ text: QUESTION, status: "unresolved" }],
+  });
+  const generated = generatedScope(true);
+  generated.inScope.push({
+    text: item.text,
+    status: "proposed",
+    rationale: "The model left this client commitment provisional.",
+    sourceQuote: item.sourceQuote,
+  });
+
+  const result = await resolveScope(
+    request({ input, scope: before, question: QUESTION }),
+    deps(generated),
+  );
+
+  const testimonial = result.scope.inScope.find((entry) =>
+    entry.text.includes("testimonials"),
+  );
+  assert.equal(testimonial?.status, "confirmed");
+  assert.equal(testimonial?.sourceQuote, item.sourceQuote);
+});
+
+test("a later confirmed clarification may change an earlier commitment", async () => {
+  const item = {
+    text: "The course catalog includes client-provided testimonials.",
+    status: "confirmed" as const,
+    sourceQuote: "We will provide testimonials.",
+  };
+  const input = `${TRANSCRIPT}\nDana: We will provide testimonials.`;
+  const question = "Should testimonials remain included?";
+  const answer = "Do not include testimonials in the first launch.";
+  const before = scope({
+    inScope: [scope().inScope[0], item],
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const generated = generatedScope(true);
+  generated.inScope = [generated.inScope[0]];
+  generated.outOfScope = [
+    {
+      text: "Testimonials are not included in the first launch.",
+      status: "confirmed",
+      sourceQuote: answer,
+    },
+  ];
+
+  const result = await resolveScope(
+    request({ input, scope: before, question, answer, confirmed: true }),
+    deps(generated),
+  );
+
+  assert.equal(result.scope.inScope.some((entry) => entry.text.includes("testimonials")), false);
+  assert.equal(result.scope.outOfScope[0].status, "confirmed");
+  assert.equal(result.scope.outOfScope[0].sourceKind, "clarification");
+});
+
 test("resolveScope keeps an unconfirmed clarification out of confirmed commitments", async () => {
   const result = await resolveScope(
     request({ confirmed: false }),
@@ -379,6 +505,66 @@ test("resolveScope passes the current edited scope to the generator", async () =
     received?.problemStatement,
     "A manually edited problem statement.",
   );
+});
+
+test("resolveScope requires explicit acknowledgement before replacing manual edits", async () => {
+  const base = scope();
+  const edited = { ...base, problemStatement: "A user's manually edited statement." };
+  let called = false;
+
+  await assert.rejects(
+    () =>
+      resolveScope(
+        request({ scope: edited, baseScope: base, acknowledgeEdits: false }),
+        {
+          ...deps(generatedScope(true)),
+          generateScope: async () => {
+            called = true;
+            return generatedScope(true);
+          },
+        },
+      ),
+    /acknowledge replacing them/i,
+  );
+
+  assert.equal(called, false);
+});
+
+test("resolveScope applies clarification after explicit edit-replacement acknowledgement", async () => {
+  const base = scope();
+  const edited = { ...base, problemStatement: "A user's manually edited statement." };
+  let received: Scope | undefined;
+
+  await resolveScope(
+    request({ scope: edited, baseScope: base, acknowledgeEdits: true }),
+    {
+      ...deps(generatedScope(true)),
+      generateScope: async (_input, options) => {
+        received = options?.currentScope;
+        return generatedScope(true);
+      },
+    },
+  );
+
+  assert.equal(received?.problemStatement, edited.problemStatement);
+});
+
+test("resolveScope does not require edit acknowledgement when the scope is unchanged", async () => {
+  const unchanged = scope();
+  let called = false;
+
+  await resolveScope(
+    request({ scope: unchanged, baseScope: unchanged, acknowledgeEdits: false }),
+    {
+      ...deps(generatedScope(true)),
+      generateScope: async () => {
+        called = true;
+        return generatedScope(true);
+      },
+    },
+  );
+
+  assert.equal(called, true);
 });
 
 test("a critique failure after generation does not mutate the request", async () => {
