@@ -151,8 +151,8 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
 export async function downloadScopePdf(scope: Scope, findings: Finding[], comparison?: ScopeComparison | null): Promise<void> {
   const pdfModule = await import("pdfmake/build/pdfmake");
   const fontModule = await import("pdfmake/build/vfs_fonts");
-  const pdfMake = (pdfModule as unknown as { default?: { addVirtualFileSystem: (vfs: object) => void; createPdf: (definition: TDocumentDefinitions) => { download: (filename: string) => void } }; addVirtualFileSystem?: (vfs: object) => void; createPdf?: (definition: TDocumentDefinitions) => { download: (filename: string) => void } }).default ?? pdfModule as unknown as { addVirtualFileSystem: (vfs: object) => void; createPdf: (definition: TDocumentDefinitions) => { download: (filename: string) => void } };
+  const pdfMake = (pdfModule as unknown as { default?: { addVirtualFileSystem: (vfs: object) => void; createPdf: (definition: TDocumentDefinitions) => { download: (filename: string) => Promise<void> } }; addVirtualFileSystem?: (vfs: object) => void; createPdf?: (definition: TDocumentDefinitions) => { download: (filename: string) => Promise<void> } }).default ?? pdfModule as unknown as { addVirtualFileSystem: (vfs: object) => void; createPdf: (definition: TDocumentDefinitions) => { download: (filename: string) => Promise<void> } };
   const vfs = (fontModule as unknown as { default?: object }).default ?? fontModule;
   pdfMake.addVirtualFileSystem(vfs);
-  pdfMake.createPdf(scopeToPdfDefinition(scope, findings, comparison)).download(pdfFilename(scope));
+  await pdfMake.createPdf(scopeToPdfDefinition(scope, findings, comparison)).download(pdfFilename(scope));
 }

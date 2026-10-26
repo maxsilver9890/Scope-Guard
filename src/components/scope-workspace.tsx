@@ -28,7 +28,7 @@ import type {
 } from "@/lib/schema";
 
 type AnalysisStatus = "idle" | "loading" | "success" | "error";
-type ExportStatus = "idle" | "success" | "error";
+type ExportStatus = "idle" | "loading" | "success" | "error";
 type ScopeItemSection =
   | "inScope"
   | "outOfScope"
@@ -1231,10 +1231,11 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   }
 
   async function handleExport() {
-    if (!editedScope || !findings) {
+    if (!editedScope || !findings || exportStatus === "loading") {
       return;
     }
 
+    setExportStatus("loading");
     try {
       await downloadScopePdf(editedScope, findings, comparison);
       setExportStatus("success");
@@ -1485,11 +1486,17 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     </button>
                     <button
                       type="button"
-                      onClick={handleExport}
+                      onClick={() => void handleExport()}
+                      disabled={exportStatus === "loading"}
+                      aria-busy={exportStatus === "loading"}
                       className={TOOLBAR_PRIMARY}
                     >
-                      <DownloadIcon />
-                      Download PDF
+                      {exportStatus === "loading" ? (
+                        <Spinner className="h-3.5 w-3.5" />
+                      ) : (
+                        <DownloadIcon />
+                      )}
+                      {exportStatus === "loading" ? "Preparing PDF…" : "Download PDF"}
                     </button>
                   </div>
                   <p
@@ -1501,11 +1508,13 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                         : "text-muted"
                     }`}
                   >
-                    {exportStatus === "success"
-                      ? "PDF downloaded."
-                      : exportStatus === "error"
-                        ? "Export failed. Try again."
-                        : ""}
+                    {exportStatus === "loading"
+                      ? "Preparing your PDF. Please wait for the download to start…"
+                      : exportStatus === "success"
+                        ? "PDF download started. Please wait for it to finish in your browser."
+                        : exportStatus === "error"
+                          ? "Export failed. Try again."
+                          : ""}
                   </p>
                 </div>
                 </div>
