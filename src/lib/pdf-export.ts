@@ -32,7 +32,7 @@ function itemContent(item: ScopeItem, clarifications: Clarification[]): Content[
   if (item.rationale) parts.push({ text: [{ text: "Rationale  ", bold: true, color: "#596579" }, item.rationale], fontSize: 8.5, color: "#596579", margin: [72, 0, 0, 4], lineHeight: 1.2 });
   if (item.sourceQuote) parts.push({ text: [{ text: "Source evidence  ", bold: true }, `“${item.sourceQuote}”`], fontSize: 8.2, italics: true, color: "#596579", margin: [72, 0, 0, 4], lineHeight: 1.2 });
   if (source) parts.push({ text: source.confirmed ? "Source: client-confirmed clarification" : "Source: unconfirmed clarification", fontSize: 7.5, color: "#64748b", margin: [72, 0, 0, 4] });
-  return parts;
+  return [{ stack: parts, margin: [0, 0, 0, 5], unbreakable: true }];
 }
 
 function itemSection(title: string, items: ScopeItem[], clarifications: Clarification[]): Content[] {
@@ -87,7 +87,7 @@ export function pdfFilename(scope: Scope, date = new Date()): string {
 
 export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparison?: ScopeComparison | null, date = new Date()): TDocumentDefinitions {
   const clarifications = scope.clarifications ?? [];
-  const title = scope.problemStatement.split(/[.!?\n]/)[0].split(/\s+/).slice(0, 6).join(" ") || "Project Scope";
+  const title = scope.problemStatement.split(/[.!?\n]/)[0].trim() || "Project Scope";
   const sections: { name: string; id: string; content: Content[] }[] = [];
   const add = (name: string, id: string, content: Content[]) => sections.push({ name, id, content });
   const statusCounts = { confirmed: 0, inferred: 0, proposed: 0, unresolved: 0 };
@@ -112,24 +112,21 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
   if (comparison) add("Change Summary", "change-summary", changeContent(comparison));
 
   const definition: TDocumentDefinitions = {
-    pageSize: "A4", pageMargins: [52, 58, 52, 52],
+    pageSize: "A4", pageMargins: [48, 48, 48, 46],
     info: { title: `${title} — Project Scope & Requirements`, subject: "Scope Specification", creator: "Scope Guard" },
     defaultStyle: { font: "Roboto", fontSize: 9.5, color: "#263148" },
     styles: {
-      section: { fontSize: 17, bold: true, color: "#1b2440", margin: [0, 0, 0, 12] },
-      subhead: { fontSize: 10.5, bold: true, color: "#1b2440", margin: [0, 10, 0, 4] },
-      toc: { fontSize: 10, color: "#263148", margin: [0, 4, 0, 4] },
+      section: { fontSize: 16, bold: true, color: "#1b2440", margin: [0, 0, 0, 8], keepWithNext: true },
+      subhead: { fontSize: 10, bold: true, color: "#1b2440", margin: [0, 8, 0, 3], keepWithNext: true },
     },
-    footer: (currentPage, pageCount) => currentPage === 1 ? "" : ({ columns: [{ text: "SCOPE GUARD  ·  SCOPE SPECIFICATION", color: "#788397", fontSize: 7.5 }, { text: `${currentPage} / ${pageCount}`, alignment: "right", color: "#788397", fontSize: 7.5 }], margin: [52, 14, 52, 0] }),
+    footer: (currentPage, pageCount) => currentPage === 1 ? "" : ({ columns: [{ text: "SCOPE GUARD  ·  SCOPE SPECIFICATION", color: "#788397", fontSize: 7.5 }, { text: `${currentPage} / ${pageCount}`, alignment: "right", color: "#788397", fontSize: 7.5 }], margin: [48, 12, 48, 0] }),
     content: [
       { stack: [
-        { text: "SCOPE GUARD", color: "#4f46e5", characterSpacing: 1.5, bold: true, fontSize: 9, margin: [0, 0, 0, 42] },
-        { text: title, color: "#1b2440", bold: true, fontSize: 29, lineHeight: 1.1, margin: [0, 0, 0, 10] },
-        { text: "Project Scope & Requirements", color: "#596579", fontSize: 16, margin: [0, 0, 0, 24] },
-        { text: "SCOPE SPECIFICATION", color: "#4f46e5", bold: true, characterSpacing: 1.2, fontSize: 8, margin: [0, 0, 0, 30] },
-        { text: `Prepared ${date.toLocaleDateString("en", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })}`, color: "#596579", fontSize: 9, margin: [0, 0, 0, 4] },
-        { text: "Source: user-provided source material", color: "#596579", fontSize: 9, margin: [0, 0, 0, 35] },
-        { text: "COMMITMENT STATUS", color: "#1b2440", bold: true, fontSize: 8, characterSpacing: 0.7, margin: [0, 0, 0, 8] },
+        { text: "SCOPE GUARD", color: "#4f46e5", bold: true, fontSize: 10, margin: [0, 0, 0, 28] },
+        { columns: [{ width: 460, text: title, color: "#1b2440", bold: true, fontSize: 27, lineHeight: 1.08, margin: [0, 0, 0, 8] }] },
+        { text: "Project Scope & Requirements", color: "#596579", fontSize: 14, margin: [0, 0, 0, 16] },
+        { text: `Prepared ${date.toLocaleDateString("en", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })}`, color: "#596579", fontSize: 9, margin: [0, 0, 0, 22] },
+        { text: "COMMITMENT STATUS", color: "#1b2440", bold: true, fontSize: 8, margin: [0, 0, 0, 7] },
         { ul: [
           { text: [{ text: "Confirmed  ", color: statusColors.confirmed, bold: true }, "Directly stated in the source"] },
           { text: [{ text: "Inferred  ", color: statusColors.inferred, bold: true }, "Interpretation; rationale retained"] },
@@ -137,9 +134,9 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
           { text: [{ text: "Unresolved  ", color: statusColors.unresolved, bold: true }, "Open decision"] },
         ], fontSize: 8.5, color: "#596579", lineHeight: 1.35, markerColor: "#aab2c0" },
       ], pageBreak: "after" },
-      { text: "Contents", style: "section", toc: { title: { text: "Contents", style: "section" } }, pageBreak: "after" },
+      { text: "Contents", style: "section", toc: { id: "scope-sections", textStyle: { fontSize: 9.5, color: "#263148" }, numberStyle: { fontSize: 9.5, color: "#596579" }, textMargin: [0, 5, 0, 5] }, pageBreak: "after" },
       ...sections.flatMap((section) => [
-        { text: section.name, style: "section", id: section.id, tocItem: true, bookmark: { title: section.name, bold: true } },
+        { text: section.name, style: "section", id: section.id, tocItem: "scope-sections", bookmark: { title: section.name, bold: true } },
         ...section.content,
         { text: "", margin: [0, 0, 0, 8] },
       ]),

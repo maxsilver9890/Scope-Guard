@@ -38,7 +38,10 @@ Fidelity rules:
 - Acceptance criteria must be observable without invented numbers: use wording such as "meets the performance target agreed with the client" and add the missing target to openQuestions. Do not add time limits such as "under five minutes".
 - If the client says budget tracking is "if it's easy", classify it as proposed, not confirmed.
 - Do not move an explicitly requested feature to outOfScope without marking that exclusion as proposed.
+- If the client says a feature is undecided, unresolved, or still under consideration, keep it in openQuestions; do not list it as an exclusion.
 - Do not treat an unstated feature as explicitly excluded.
+- Preserve direct client commitments even when they are qualitative (for example, providing course descriptions or testimonials); do not downgrade them merely because implementation details remain undecided.
+- Do not treat a broad feature label (for example, "basic SEO") as a confirmed acceptance criterion unless the client agreed to an observable boundary. Keep the broad requirement at its supported status and ask about the missing boundary in openQuestions.
 - sourceQuote must be a short verbatim substring of the original input or a recorded clarification (roughly 4-40 words), never a paraphrase and never text from your own summary. Omit sourceQuote for proposed items.
 - problemStatement is a plain string: 1-3 sentences describing the underlying business problem without adding commitments.
 
