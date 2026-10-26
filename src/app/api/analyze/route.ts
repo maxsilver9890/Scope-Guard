@@ -1,6 +1,7 @@
 import { toApiFailure } from "@/lib/api-errors";
 import { critiqueScope } from "@/lib/critique";
 import { generateScope } from "@/lib/generate";
+import { reconcileCritique, ScopeReconciliationError } from "@/lib/reconcile";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -33,11 +34,19 @@ export async function POST(request: Request) {
   const source = input.trim();
 
   try {
-    const scope = await generateScope(source);
-    const findings = await critiqueScope(source, scope);
+    const initialScope = await generateScope(source);
+    const initialFindings = await critiqueScope(source, initialScope);
+    const { scope, findings } = await reconcileCritique(
+      source,
+      initialScope,
+      initialFindings,
+    );
 
     return Response.json({ scope, findings });
   } catch (error) {
+    if (error instanceof ScopeReconciliationError) {
+      return Response.json({ error: error.message }, { status: 422 });
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.error("[analyze] pipeline failed:", message);
 

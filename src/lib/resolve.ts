@@ -5,6 +5,7 @@ import { z } from "zod";
 import { critiqueScope } from "./critique";
 import { compareScopes, similarity, type ScopeComparison } from "./diff";
 import { generateScope } from "./generate";
+import { reconcileCritique } from "./reconcile";
 import {
   enforceFindingProvenance,
   isQuoteInSource,
@@ -326,17 +327,19 @@ export async function resolveScope(
     verified.data,
     { clarifications },
   );
-
-  const findings = enforceFindingProvenance(
-    generatedFindings,
-    corpus,
-  ).findings;
+  const reconciled = await reconcileCritique(
+    data.input,
+    verified.data,
+    enforceFindingProvenance(generatedFindings, corpus).findings,
+    { clarifications },
+    { generateScope: deps.generateScope, critiqueScope: deps.critiqueScope },
+  );
 
   const comparison = compareScopes(
     data.scope,
-    verified.data,
+    reconciled.scope,
     data.findings,
-    findings,
+    reconciled.findings,
     {
       question: data.question,
       answer: data.answer,
@@ -345,8 +348,8 @@ export async function resolveScope(
   );
 
   return {
-    scope: verified.data,
-    findings,
+    scope: reconciled.scope,
+    findings: reconciled.findings,
     comparison,
   };
 }

@@ -2,6 +2,8 @@
 
 import {
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -1048,6 +1050,15 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   const [isResolving, setIsResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [comparison, setComparison] = useState<ScopeComparison | null>(null);
+  const exportLockRef = useRef(false);
+  const downloadButtonRef = useRef<HTMLButtonElement>(null);
+  const reviewQuestionsButtonRef = useRef<HTMLButtonElement>(null);
+  const downloadAnywayButtonRef = useRef<HTMLButtonElement>(null);
+  const latestExportStateRef = useRef({ editedScope, findings, comparison, isEdited });
+
+  useLayoutEffect(() => {
+    latestExportStateRef.current = { editedScope, findings, comparison, isEdited };
+  }, [editedScope, findings, comparison, isEdited]);
 
   const isAnalyzing = status === "loading";
   const hasResults =
@@ -1056,7 +1067,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     hasResults && editedScope ? countStatuses(editedScope) : null;
   const pdfPreflight = editedScope
     ? getPdfExportPreflight(editedScope)
-    : { requiresConfirmation: false, count: 0 };
+    : { requiresConfirmation: false, count: 0, unansweredCount: 0, tentativeCount: 0, confirmedButUnresolvedCount: 0 };
 
   const navItems: NavItem[] =
     hasResults && editedScope
@@ -1112,9 +1123,22 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
       return;
     }
 
+    reviewQuestionsButtonRef.current?.focus();
+
     const dismissOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setPdfWarningOpen(false);
+        downloadButtonRef.current?.focus();
+      } else if (event.key === "Tab") {
+        const first = reviewQuestionsButtonRef.current;
+        const last = downloadAnywayButtonRef.current;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
       }
     };
 
@@ -1229,6 +1253,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   function applyScopeEdit(next: Scope) {
     setEditedScope(next);
     setIsEdited(scope ? JSON.stringify(next) !== JSON.stringify(scope) : true);
+    setComparison(null);
     setExportStatus("idle");
   }
 
@@ -1251,25 +1276,34 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   }
 
   async function exportCurrentPdf() {
-    if (!editedScope || !findings || exportStatus === "loading") {
+    if (exportLockRef.current) {
       return;
     }
 
+    const current = latestExportStateRef.current;
+    if (!current.editedScope || !current.findings) return;
+
+    exportLockRef.current = true;
     setExportStatus("loading");
     try {
-      await downloadScopePdf(editedScope, findings, comparison);
+      await downloadScopePdf(current.editedScope, current.findings, current.comparison, current.isEdited);
       setExportStatus("success");
     } catch {
       setExportStatus("error");
+    } finally {
+      exportLockRef.current = false;
     }
   }
 
   function handleExport() {
-    if (!editedScope || !findings || exportStatus === "loading") {
+    if (exportLockRef.current) {
       return;
     }
 
-    if (pdfPreflight.requiresConfirmation) {
+    const current = latestExportStateRef.current;
+    if (!current.editedScope || !current.findings) return;
+
+    if (getPdfExportPreflight(current.editedScope).requiresConfirmation) {
       setPdfWarningOpen(true);
       return;
     }
@@ -1278,7 +1312,10 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   }
 
   function handleResolveQuestionsFromWarning() {
-    const firstQuestion = pdfPreflight.firstQuestion;
+    const currentScope = latestExportStateRef.current.editedScope;
+    const firstQuestion = currentScope
+      ? getPdfExportPreflight(currentScope).firstQuestion
+      : undefined;
     setPdfWarningOpen(false);
     if (!firstQuestion) {
       return;
@@ -1286,7 +1323,10 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
 
     setResolveTarget(firstQuestion.text);
     setResolveError(null);
-    window.requestAnimationFrame(() => scrollToSection("open-questions"));
+    window.requestAnimationFrame(() => {
+      scrollToSection("open-questions");
+      document.getElementById("clarification-answer")?.focus();
+    });
   }
 
   async function handleResolve(submission: ResolveSubmission) {
@@ -1393,28 +1433,22 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               id="pdf-pending-questions-title"
               className="mt-2 font-serif text-2xl leading-tight text-forest"
             >
-              {pdfPreflight.count} unanswered {pdfPreflight.count === 1 ? "question" : "questions"}
+              Some questions remain unresolved
             </h2>
             <p
               id="pdf-pending-questions-description"
               className="mt-3 text-[13px] leading-6 text-muted"
             >
-              Resolving these questions may produce a more complete and accurate scope document. You can answer them now or download the current scope with the open questions included.
+              {pdfPreflight.count} {pdfPreflight.count === 1 ? "clarification question remains" : "clarification questions remain"} open in this scope. {pdfPreflight.unansweredCount > 0 ? `${pdfPreflight.unansweredCount} ${pdfPreflight.unansweredCount === 1 ? "has" : "have"} no answer. ` : ""}{pdfPreflight.tentativeCount > 0 ? `${pdfPreflight.tentativeCount} ${pdfPreflight.tentativeCount === 1 ? "has" : "have"} a tentative answer. ` : ""}{pdfPreflight.confirmedButUnresolvedCount > 0 ? `${pdfPreflight.confirmedButUnresolvedCount} ${pdfPreflight.confirmedButUnresolvedCount === 1 ? "has" : "have"} a client-confirmed answer but remains open because the decision is not resolved. ` : ""}Resolving them may improve the report. You can review the questions or download the current scope with its open issues clearly shown.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setPdfWarningOpen(false)}
-                className={TOOLBAR_BUTTON}
-              >
-                Not now
-              </button>
-              <button
-                type="button"
                 onClick={handleResolveQuestionsFromWarning}
+                ref={reviewQuestionsButtonRef}
                 className={TOOLBAR_BUTTON}
               >
-                Resolve Questions
+                Review questions
               </button>
               <button
                 type="button"
@@ -1422,9 +1456,10 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   setPdfWarningOpen(false);
                   void exportCurrentPdf();
                 }}
+                ref={downloadAnywayButtonRef}
                 className={TOOLBAR_PRIMARY}
               >
-                Download Anyway
+                Download anyway
               </button>
             </div>
           </div>
@@ -1594,6 +1629,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     <button
                       type="button"
                       onClick={() => void handleExport()}
+                      ref={downloadButtonRef}
                       disabled={exportStatus === "loading"}
                       aria-busy={exportStatus === "loading"}
                       className={TOOLBAR_PRIMARY}
@@ -1620,7 +1656,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                       : exportStatus === "success"
                         ? "PDF download started. Please wait for it to finish in your browser."
                         : exportStatus === "error"
-                          ? "Export failed. Try again."
+                          ? "PDF generation failed. Check browser download permissions, then retry."
                           : ""}
                   </p>
                 </div>

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test tests/provenance.test.ts tests/markdown.test.ts tests/diff.test.ts tests/clarifications.test.ts tests/pdf-preflight.test.ts tests/pdf-export.test.ts tests/source-text.test.ts tests/routes.test.ts tests/api-errors.test.ts tests/transcription.test.ts"
+    "test": "tsx --test tests/provenance.test.ts tests/markdown.test.ts tests/diff.test.ts tests/clarifications.test.ts tests/pdf-preflight.test.ts tests/pdf-export.test.ts tests/reconciliation.test.ts tests/source-text.test.ts tests/routes.test.ts tests/api-errors.test.ts tests/transcription.test.ts"
   },
   "dependencies": {
     "next": "16.4.3",

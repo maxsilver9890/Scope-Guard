@@ -4,6 +4,7 @@ import {
   resolveRequestSchema,
   resolveScope,
 } from "@/lib/resolve";
+import { ScopeReconciliationError } from "@/lib/reconcile";
 
 function validationMessage(error: {
   issues: Array<{ path: PropertyKey[]; message: string }>;
@@ -39,6 +40,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof ResolveInputError) {
       return Response.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof ScopeReconciliationError) {
+      return Response.json({ error: error.message }, { status: 422 });
     }
 
     const message = error instanceof Error ? error.message : String(error);

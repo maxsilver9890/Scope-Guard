@@ -59,14 +59,27 @@ export function formatClarificationsForReview(
     return "";
   }
 
+  const latestByQuestion = new Map<string, number>();
+  clarifications.forEach((clarification, index) => {
+    latestByQuestion.set(
+      clarification.question.trim().replace(/\s+/g, " ").toLowerCase(),
+      index,
+    );
+  });
+
   return [
     "CLIENT CLARIFICATIONS (recorded separately from the transcript):",
-    ...clarifications.map((clarification) => {
+    "For repeated questions, only the latest response is current; earlier responses are history.",
+    ...clarifications.map((clarification, index) => {
       const state = clarification.confirmed
         ? "CONFIRMED BY CLIENT"
         : "UNCONFIRMED NOTE";
+      const key = clarification.question.trim().replace(/\s+/g, " ").toLowerCase();
+      const recency = latestByQuestion.get(key) === index
+        ? "LATEST RESPONSE"
+        : "HISTORICAL RESPONSE; SUPERSEDED BY LATEST RESPONSE";
       return [
-        `- [${state}]`,
+        `- [${recency}; ${state}]`,
         `  Question: ${clarification.question}`,
         `  Answer: ${clarification.answer}`,
       ].join("\n");

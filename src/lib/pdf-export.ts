@@ -27,12 +27,13 @@ function itemContent(item: ScopeItem, clarifications: Clarification[]): Content[
     columns: [
       { width: 66, text: statusLabels[item.status], color: statusColors[item.status], bold: true, fontSize: 8.2 },
       { width: "*", text: item.text, fontSize: 9.5, color: "#263148", lineHeight: 1.25 },
-    ], columnGap: 6, margin: [0, 3, 0, 3], unbreakable: true,
+    ], columnGap: 6, margin: [0, 3, 0, 3], unbreakable: item.text.length < 800,
   }];
   if (item.rationale) parts.push({ text: [{ text: "Rationale  ", bold: true, color: "#596579" }, item.rationale], fontSize: 8.5, color: "#596579", margin: [72, 0, 0, 4], lineHeight: 1.2 });
   if (item.sourceQuote) parts.push({ text: [{ text: "Source evidence  ", bold: true }, `“${item.sourceQuote}”`], fontSize: 8.2, italics: true, color: "#596579", margin: [72, 0, 0, 4], lineHeight: 1.2 });
   if (source) parts.push({ text: source.confirmed ? "Source: client-confirmed clarification" : "Source: unconfirmed clarification", fontSize: 7.5, color: "#64748b", margin: [72, 0, 0, 4] });
-  return [{ stack: parts, margin: [0, 0, 0, 5], unbreakable: true }];
+  const blockLength = item.text.length + (item.rationale?.length ?? 0) + (item.sourceQuote?.length ?? 0);
+  return [{ stack: parts, margin: [0, 0, 0, 5], unbreakable: blockLength < 900 }];
 }
 
 function itemSection(title: string, items: ScopeItem[], clarifications: Clarification[]): Content[] {
@@ -54,7 +55,7 @@ function findingContent(finding: Finding, index: number, clarifications: Clarifi
       { text: finding.description, fontSize: 9, color: "#263148", lineHeight: 1.2 },
       { text: [{ text: "Why it matters  ", bold: true }, finding.whyItMatters], fontSize: 8.5, color: "#596579", margin: [0, 4, 0, 2], lineHeight: 1.2 },
       { text: [{ text: `${attribution}  `, bold: true }, `“${finding.sourceSnippet}”`], fontSize: 8.2, italics: true, color: "#596579", margin: [0, 3, 0, 0], lineHeight: 1.2 },
-    ], margin: [0, 5, 0, 8], unbreakable: true,
+    ], margin: [0, 5, 0, 8], unbreakable: finding.description.length + finding.whyItMatters.length + finding.sourceSnippet.length < 900,
   };
 }
 
@@ -80,21 +81,55 @@ function slug(value: string): string {
   return value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48).replace(/-$/g, "") || "project-scope";
 }
 
+function coverTitleLayout(title: string): { text: string; fontSize: number } {
+  const words = title.split(/\s+/).filter(Boolean);
+  const estimatedLines = Math.max(1, Math.ceil(title.length / 36));
+  const targetLineLength = title.length / estimatedLines;
+  const lines: string[] = [];
+  let line = "";
+
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index];
+    const candidate = line ? `${line} ${word}` : word;
+    const linesRemaining = words.length - index;
+    const breaksRemaining = estimatedLines - lines.length - 1;
+    if (
+      line &&
+      breaksRemaining > 0 &&
+      linesRemaining >= breaksRemaining &&
+      candidate.length > targetLineLength
+    ) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) lines.push(line);
+
+  const fontSize = title.length > 360 ? 17 : title.length > 240 ? 19 : title.length > 140 ? 22 : 27;
+  return { text: lines.join("\n"), fontSize };
+}
+
 export function pdfFilename(scope: Scope, date = new Date()): string {
   const title = scope.problemStatement.split(/[.!?\n]/)[0].split(/\s+/).slice(0, 6).join(" ");
   return `scope-guard-${slug(title)}-${date.toISOString().slice(0, 10)}.pdf`;
 }
 
-export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparison?: ScopeComparison | null, date = new Date()): TDocumentDefinitions {
+export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparison?: ScopeComparison | null, date = new Date(), editedAfterReview = false): TDocumentDefinitions {
   const clarifications = scope.clarifications ?? [];
   const title = scope.problemStatement.split(/[.!?\n]/)[0].trim() || "Project Scope";
+  const coverTitle = coverTitleLayout(title);
   const sections: { name: string; id: string; content: Content[] }[] = [];
   const add = (name: string, id: string, content: Content[]) => sections.push({ name, id, content });
   const statusCounts = { confirmed: 0, inferred: 0, proposed: 0, unresolved: 0 };
   for (const key of ["inScope", "outOfScope", "assumptions", "openQuestions", "requirements", "acceptanceCriteria"] as const) {
     for (const item of scope[key]) statusCounts[item.status] += 1;
   }
-  add("Executive Summary", "executive-summary", [text(`This scope specification records ${statusCounts.confirmed} confirmed, ${statusCounts.inferred} inferred, ${statusCounts.proposed} proposed, and ${statusCounts.unresolved} unresolved items across the project scope and requirements.`)]);
+  add("Executive Summary", "executive-summary", [
+    ...(editedAfterReview ? [{ text: "Review status: this scope was edited after analysis. The potential delivery risks below refer to the earlier analyzed version and have not been revalidated against these edits.", fontSize: 8.5, bold: true, color: "#95631b", margin: [0, 0, 0, 8] } as Content] : []),
+    text(`This scope specification records ${statusCounts.confirmed} confirmed, ${statusCounts.inferred} inferred, ${statusCounts.proposed} proposed, and ${statusCounts.unresolved} unresolved items across the project scope and requirements.`),
+  ]);
   add("Problem Statement", "problem-statement", [text(scope.problemStatement)]);
   add("Scope Overview", "scope-overview", [text(`${scope.inScope.length} in-scope items · ${scope.outOfScope.length} exclusions · ${scope.assumptions.length} assumptions · ${scope.requirements.length} requirements · ${scope.acceptanceCriteria.length} acceptance criteria · ${scope.openQuestions.length} open questions.`)]);
   add("In Scope", "in-scope", itemSection("", scope.inScope, clarifications).slice(1));
@@ -124,7 +159,7 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
     content: [
       { stack: [
         { text: "SCOPE GUARD", color: "#4f46e5", bold: true, fontSize: 10, margin: [0, 0, 0, 28] },
-        { columns: [{ width: 460, text: title, color: "#1b2440", bold: true, fontSize: 27, lineHeight: 1.08, margin: [0, 0, 0, 8] }] },
+        { columns: [{ width: 460, text: coverTitle.text, color: "#1b2440", bold: true, fontSize: coverTitle.fontSize, lineHeight: 1.08, margin: [0, 0, 0, 8] }] },
         { text: "Project Scope & Requirements", color: "#596579", fontSize: 14, margin: [0, 0, 0, 16] },
         { text: `Prepared ${date.toLocaleDateString("en", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })}`, color: "#596579", fontSize: 9, margin: [0, 0, 0, 22] },
         { text: "COMMITMENT STATUS", color: "#1b2440", bold: true, fontSize: 8, margin: [0, 0, 0, 7] },
@@ -135,7 +170,14 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
           { text: [{ text: "Unresolved  ", color: statusColors.unresolved, bold: true }, "Open decision"] },
         ], fontSize: 8.5, color: "#596579", lineHeight: 1.35, markerColor: "#aab2c0" },
       ], pageBreak: "after" },
-      { text: "Contents", style: "section", toc: { id: "scope-sections", textStyle: { fontSize: 9.5, color: "#263148" }, numberStyle: { fontSize: 9.5, color: "#596579" }, textMargin: [0, 5, 0, 5] }, pageBreak: "after" },
+      {
+        stack: [
+          { text: "Contents", style: "section", margin: [0, 0, 0, 8] },
+          { text: "Section list (page positions may vary with content)", fontSize: 8, color: "#64748b", margin: [0, 0, 0, 8] },
+          ...sections.map((section) => ({ text: section.name, fontSize: 9.5, color: "#263148", margin: [0, 3, 0, 3] })),
+        ],
+        pageBreak: "after",
+      },
       ...sections.flatMap((section) => [
         { text: section.name, style: "section", id: section.id, tocItem: "scope-sections", bookmark: { title: section.name, bold: true } },
         ...section.content,
@@ -146,11 +188,11 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
   return definition;
 }
 
-export async function downloadScopePdf(scope: Scope, findings: Finding[], comparison?: ScopeComparison | null): Promise<void> {
+export async function downloadScopePdf(scope: Scope, findings: Finding[], comparison?: ScopeComparison | null, editedAfterReview = false): Promise<void> {
   const pdfModule = await import("pdfmake/build/pdfmake");
   const fontModule = await import("pdfmake/build/vfs_fonts");
   const pdfMake = (pdfModule as unknown as { default?: { addVirtualFileSystem: (vfs: object) => void; createPdf: (definition: TDocumentDefinitions) => { download: (filename: string) => Promise<void> } }; addVirtualFileSystem?: (vfs: object) => void; createPdf?: (definition: TDocumentDefinitions) => { download: (filename: string) => Promise<void> } }).default ?? pdfModule as unknown as { addVirtualFileSystem: (vfs: object) => void; createPdf: (definition: TDocumentDefinitions) => { download: (filename: string) => Promise<void> } };
   const vfs = (fontModule as unknown as { default?: object }).default ?? fontModule;
   pdfMake.addVirtualFileSystem(vfs);
-  await pdfMake.createPdf(scopeToPdfDefinition(scope, findings, comparison)).download(pdfFilename(scope));
+  await pdfMake.createPdf(scopeToPdfDefinition(scope, findings, comparison, new Date(), editedAfterReview)).download(pdfFilename(scope));
 }

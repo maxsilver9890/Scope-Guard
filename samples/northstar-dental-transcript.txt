@@ -1,0 +1,33 @@
+Northstar Dental discovery call notes
+
+The owner expects a second dental clinic to open in approximately six weeks. We want the website ready before the second clinic opens, but we have some scheduling flexibility.
+
+The website needs a homepage, separate pages for both clinic locations, service pages, an about page, and contact information. Each location page needs its address, hours, phone number, and a map.
+
+Online appointment booking is preferred, but our receptionist is concerned about changing availability. A request form is another possibility. We have not decided which booking method to use.
+
+We use DentDesk. Any integration depends on vendor and API confirmation, and the website must not replace DentDesk.
+
+Online payments are not a launch requirement. Patients will pay at the clinic for now; we may consider online deposits later.
+
+The website must work on mobile. Readable text and keyboard navigation are important, but we have not agreed to a formal accessibility standard.
+
+The client will provide contact details and the logo.
+Photos of the new clinic are not available yet.
+
+Our marketing contact expects to write the service descriptions, but estimates about two weeks and is not certain.
+Copywriting is not included unless separately approved.
+
+We want basic SEO, including page titles, meta descriptions, and local-search considerations. Higher rankings would be great, but are not guaranteed. Ongoing SEO has not been agreed.
+
+Our budget range is INR 80,000 to INR 100,000. The owner said it sounds reasonable, but written approval is pending.
+
+The design should feel premium but approachable and use our dark-green and cream branding.
+
+Patient accounts and access to or storage of medical records are explicitly excluded.
+No medical records should be stored on the website.
+
+Automated reminders might be useful later.
+They are not part of the launch scope. Our receptionist will handle confirmations manually at launch.
+
+We want fewer missed appointments, but we have not agreed to a quantified reduction or guaranteed outcome. The agency is preparing a proposed scope and must distinguish confirmed decisions from assumptions and open questions.

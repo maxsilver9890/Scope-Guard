@@ -2,6 +2,7 @@ import { chatCompletion } from "./deepseek";
 import { repairScopeProvenance } from "./provenance";
 import { formatClarificationsForReview, formatScopeForReview } from "./scope-format";
 import {
+  type Finding,
   rawScopeSchema,
   scopeSchema,
   type Clarification,
@@ -50,6 +51,7 @@ Every array must be present. Use an empty array when the input genuinely has not
 const CLARIFICATION_RULES = `A CLIENT CLARIFICATIONS block may be present. It is recorded separately from the original client transcript.
 
 Clarification rules:
+- If a question has multiple recorded answers, only the latest response for that question describes the current decision; earlier responses are historical context and must not override it.
 - An answer labelled "CONFIRMED BY CLIENT" is client-confirmed source material. You may mark an item confirmed only when its sourceQuote is copied verbatim from that answer. Never upgrade unrelated items.
 - An answer labelled "UNCONFIRMED NOTE" is not client agreement. Never mark an item based on it as confirmed; use proposed or inferred with a rationale.
 - When an answer changes an existing decision, update or remove the affected item in the appropriate main scope section. Do not leave a stale exclusion or requirement beside the new decision. Keep a remaining partial decision as an open question.
@@ -79,6 +81,8 @@ export type GenerateOptions = {
   clarifications?: Clarification[];
   /** The current document, including manual edits, for context. */
   currentScope?: Scope;
+  /** Findings that identified scope/source conflicts requiring one repair pass. */
+  reconciliationFindings?: Finding[];
 };
 
 /** Strip an accidental markdown fence, then parse JSON. */
@@ -129,6 +133,7 @@ function buildUserMessage(
   rawInput: string,
   clarifications: Clarification[],
   currentScope: Scope | undefined,
+  reconciliationFindings: Finding[] | undefined,
 ): string {
   const parts = [`ORIGINAL CLIENT TRANSCRIPT:\n${rawInput}`];
 
@@ -144,6 +149,10 @@ function buildUserMessage(
     );
   }
 
+  if (reconciliationFindings?.length) {
+    parts.push(`CRITIQUE FINDINGS TO RECONCILE WITH THE FINAL SCOPE:\n${JSON.stringify(reconciliationFindings, null, 2)}\n\nCorrect objectively inaccurate scope statements only where the original transcript or a client-confirmed clarification supports the correction. Where the source remains uncertain, retain that uncertainty in openQuestions and avoid presenting either alternative as an agreed decision. Preserve relevant user edits and unrelated supported commitments.`);
+  }
+
   return parts.join("\n\n");
 }
 
@@ -154,8 +163,8 @@ export async function generateScope(
   const clarifications = mergeClarifications(options);
   const systemPrompt =
     clarifications.length > 0
-      ? `${BASE_RULES}\n\n${CLARIFICATION_RULES}\n\n${OUTPUT_SHAPE}`
-      : `${BASE_RULES}\n\n${OUTPUT_SHAPE}`;
+      ? `${BASE_RULES}\n\n${CLARIFICATION_RULES}\n\n${options.reconciliationFindings?.length ? "Reconciliation pass: address the supplied findings in the returned scope itself. Do not merely repeat them in openQuestions; preserve source-backed decisions, and keep unresolved alternatives explicitly unresolved." : ""}\n\n${OUTPUT_SHAPE}`
+      : `${BASE_RULES}\n\n${options.reconciliationFindings?.length ? "Reconciliation pass: address the supplied findings in the returned scope itself. Do not merely repeat them in openQuestions; preserve source-backed decisions, and keep unresolved alternatives explicitly unresolved." : ""}\n\n${OUTPUT_SHAPE}`;
 
   const result = await chatCompletion(
     [
@@ -166,6 +175,7 @@ export async function generateScope(
           rawInput,
           clarifications,
           options.currentScope,
+          options.reconciliationFindings,
         ),
       },
     ],

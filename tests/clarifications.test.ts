@@ -12,6 +12,7 @@ import {
   resolveScope,
   type ResolveRequest,
 } from "../src/lib/resolve.ts";
+import { formatClarificationsForReview } from "../src/lib/scope-format.ts";
 import type { Clarification, Finding, Scope } from "../src/lib/schema.ts";
 
 const TRANSCRIPT = `Dana: We need a dashboard for the team.
@@ -117,6 +118,16 @@ function request(overrides: Partial<ResolveRequest> = {}): ResolveRequest {
     ...overrides,
   };
 }
+
+test("repeated clarification answers mark only the newest response as current", () => {
+  const block = formatClarificationsForReview([
+    { id: "old", question: QUESTION, answer: "Maybe Monday.", confirmed: false },
+    { id: "new", question: QUESTION, answer: "Still undecided.", confirmed: true },
+  ]);
+
+  assert.match(block, /HISTORICAL RESPONSE; SUPERSEDED BY LATEST RESPONSE; UNCONFIRMED NOTE/);
+  assert.match(block, /LATEST RESPONSE; CONFIRMED BY CLIENT/);
+});
 
 test("findQuoteOrigin distinguishes transcript and clarification quotes", () => {
   const corpus = { transcript: TRANSCRIPT, clarifications: [CONFIRMED] };
