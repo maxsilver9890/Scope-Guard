@@ -45,6 +45,10 @@ export async function POST(request: Request) {
     return Response.json({ scope, findings });
   } catch (error) {
     if (error instanceof ScopeReconciliationError) {
+      console.warn("[analyze] validation rejected", {
+        stage: error.stage,
+        category: error.category,
+      });
       return Response.json({ error: error.message }, { status: 422 });
     }
     const message = error instanceof Error ? error.message : String(error);

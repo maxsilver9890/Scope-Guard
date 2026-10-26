@@ -7,6 +7,7 @@ import {
   type Clarification,
   type Finding,
   type Scope,
+  type ScopeItem,
 } from "./schema";
 
 export type ReconciliationDependencies = {
@@ -20,9 +21,19 @@ export type ReconciliationResult = {
   reconciled: boolean;
 };
 
+export type ReconciliationFailureCategory =
+  | "invalid-reconciled-scope"
+  | "confirmed-decision-conflict";
+
 export class ScopeReconciliationError extends Error {
-  constructor() {
-    super("The scope still contains a confirmed decision that conflicts with the source. Your current results were left unchanged. Review the source and open questions, then retry analysis.");
+  readonly stage = "reconciliation-validation";
+
+  constructor(readonly category: ReconciliationFailureCategory) {
+    super(
+      category === "confirmed-decision-conflict"
+        ? "The generated scope still marks a decision as confirmed even though the review found a conflict. Your previous results are unchanged. Review the flagged commitment and related open questions, then retry analysis."
+        : "The generated scope could not be validated. Your previous results are unchanged. Retry analysis; if the problem continues, contact support.",
+    );
     this.name = "ScopeReconciliationError";
   }
 }
@@ -30,6 +41,7 @@ type CommitmentSection = "inScope" | "outOfScope" | "requirements" | "acceptance
 const commitmentSections: CommitmentSection[] = [
   "inScope", "outOfScope", "requirements", "acceptanceCriteria",
 ];
+const includedSections: CommitmentSection[] = ["inScope", "requirements", "acceptanceCriteria"];
 
 function preserveUnchallengedConfirmedItems(
   previous: Scope,
@@ -62,23 +74,40 @@ function preserveUnchallengedConfirmedItems(
   return next;
 }
 
-function hasUnresolvedIssue(scope: Scope, finding: Finding): boolean {
-  return scope.openQuestions.some((question) =>
-    Math.max(
-      similarity(question.text, finding.description),
-      similarity(question.text, finding.sourceSnippet),
-    ) >= 0.18,
-  );
-}
-
 function hasConfirmedConflict(scope: Scope, finding: Finding): boolean {
-  return commitmentSections.some((section) => scope[section].some((item) =>
-    item.status === "confirmed" && Math.max(
-      similarity(item.text, finding.description),
-      similarity(item.text, finding.sourceSnippet),
-      item.sourceQuote ? similarity(item.sourceQuote, finding.sourceSnippet) : 0,
-    ) >= 0.18,
-  ));
+  // Match the critique's description to the decision and its direction. A
+  // source quote often repeats the topic while describing a different,
+  // unresolved choice (for example, room categories versus product filters).
+  // Matching raw quote tokens made those neighboring decisions look like
+  // confirmed contradictions. An explicit exclusion must also not be read as
+  // an included feature just because a critique mentions both directions.
+  const minimumDecisionMatch = 0.24;
+  const description = finding.description.toLowerCase();
+  const saysIncluded = /\b(?:include[ds]?|in scope|approv(?:ed|es)|confirm(?:ed|s)|require[ds]?|will offer|will support)\b/.test(description);
+  const saysExcluded = /\b(?:exclud(?:e|es|ed)|out of scope|not included|omitted)\b/.test(description);
+  const saysUnsettled = /\b(?:undecided|not decided|tentative|not confirmed|not agreed|unapproved|despite|although|conflicts?|contradicts?|unsupported)\b/.test(description);
+  const saysSourceConfirms = /\b(?:client confirms|source confirms|explicitly requested|explicitly required|agreed to|confirmed by the client)\b/.test(description);
+  const sourceExplicitlyBlocks = /\b(?:explicitly excluded|expressly excluded|forbidden|prohibited|refused|denied|will not approve|cannot approve|unavailable)\b/i.test(finding.sourceSnippet);
+  const isConditional = (text: string) =>
+    /\b(?:only if|only after|subject to|conditional on|contingent on|provided that|unless|if)\b/i.test(text);
+  const itemConflicts = (item: ScopeItem) => {
+    const directlyMatchesDecision =
+      similarity(item.text, finding.description) >= minimumDecisionMatch;
+    const conditionIsPartOfDecision =
+      isConditional(item.text) || Boolean(item.sourceQuote && isConditional(item.sourceQuote));
+
+    return directlyMatchesDecision && (!conditionIsPartOfDecision || sourceExplicitlyBlocks);
+  };
+
+  if (saysIncluded && saysUnsettled && includedSections.some((section) =>
+    scope[section].some((item) =>
+      item.status === "confirmed" && itemConflicts(item),
+    ),
+  )) return true;
+
+  return saysExcluded && saysSourceConfirms && scope.outOfScope.some((item) =>
+    item.status === "confirmed" && itemConflicts(item),
+  );
 }
 
 /**
@@ -114,17 +143,17 @@ export async function reconcileCritique(
   const repaired = repairScopeProvenance(candidate, corpus);
   const parsed = scopeSchema.safeParse({ ...repaired.scope, clarifications });
   if (!parsed.success) {
-    throw new ScopeReconciliationError();
+    throw new ScopeReconciliationError("invalid-reconciled-scope");
   }
 
   const reviewed = await deps.critiqueScope(input, parsed.data, { clarifications });
   const verifiedFindings = enforceFindingProvenance(reviewed, corpus).findings;
   const unaddressed = verifiedFindings.filter((finding) =>
     (finding.type === "contradiction" || finding.type === "unsupported-assumption") &&
-    (!hasUnresolvedIssue(parsed.data, finding) || hasConfirmedConflict(parsed.data, finding)),
+    hasConfirmedConflict(parsed.data, finding),
   );
   if (unaddressed.length > 0) {
-    throw new ScopeReconciliationError();
+    throw new ScopeReconciliationError("confirmed-decision-conflict");
   }
   return { scope: parsed.data, findings: verifiedFindings, reconciled: true };
 }

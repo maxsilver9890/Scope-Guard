@@ -3,12 +3,18 @@
 import {
   useEffect,
   useLayoutEffect,
+  useReducer,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 
 import { downloadScopePdf } from "@/lib/pdf-export";
+import {
+  analysisRequestBody,
+  analysisResultsReducer,
+  EMPTY_ANALYSIS_RESULTS,
+} from "@/lib/analysis-state";
 import { getPdfExportPreflight } from "@/lib/clarifications";
 import { ScopeInput } from "@/components/scope-input";
 import {
@@ -1036,20 +1042,20 @@ function FindingCard({
 
 export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   const [input, setInput] = useState(initialInput);
-  const [scope, setScope] = useState<Scope | null>(null);
-  const [editedScope, setEditedScope] = useState<Scope | null>(null);
-  const [findings, setFindings] = useState<Finding[] | null>(null);
+  const [analysisResults, dispatchAnalysisResults] = useReducer(
+    analysisResultsReducer,
+    EMPTY_ANALYSIS_RESULTS,
+  );
+  const { scope, editedScope, findings, analyzedInput, comparison } = analysisResults;
   const [status, setStatus] = useState<AnalysisStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
   const [pdfWarningOpen, setPdfWarningOpen] = useState(false);
-  const [analyzedInput, setAnalyzedInput] = useState<string | null>(null);
   const [resolveTarget, setResolveTarget] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
-  const [comparison, setComparison] = useState<ScopeComparison | null>(null);
   const exportLockRef = useRef(false);
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
   const reviewQuestionsButtonRef = useRef<HTMLButtonElement>(null);
@@ -1188,7 +1194,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: source }),
+        body: JSON.stringify(analysisRequestBody(source)),
       });
 
       const payload: unknown = await response.json().catch(() => null);
@@ -1217,11 +1223,12 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
       const nextScope = payload.scope as Scope;
       const nextFindings = payload.findings as Finding[];
 
-      setScope(nextScope);
-      setEditedScope(nextScope);
-      setFindings(nextFindings);
-      setAnalyzedInput(source);
-      setComparison(null);
+      dispatchAnalysisResults({
+        type: "analysis-succeeded",
+        input: source,
+        scope: nextScope,
+        findings: nextFindings,
+      });
       setResolveTarget(null);
       setResolveError(null);
       setIsEdited(false);
@@ -1237,6 +1244,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             : "The analysis could not be completed. Please try again.";
       setError(message);
       setStatus("error");
+      dispatchAnalysisResults({ type: "analysis-failed" });
     }
   }
 
@@ -1251,9 +1259,8 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   }
 
   function applyScopeEdit(next: Scope) {
-    setEditedScope(next);
+    dispatchAnalysisResults({ type: "scope-edited", scope: next });
     setIsEdited(scope ? JSON.stringify(next) !== JSON.stringify(scope) : true);
-    setComparison(null);
     setExportStatus("idle");
   }
 
@@ -1385,10 +1392,12 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
       }
 
       const nextScope = payload.scope as Scope;
-      setScope(nextScope);
-      setEditedScope(nextScope);
-      setFindings(payload.findings as Finding[]);
-      setComparison(payload.comparison);
+      dispatchAnalysisResults({
+        type: "clarification-succeeded",
+        scope: nextScope,
+        findings: payload.findings as Finding[],
+        comparison: payload.comparison,
+      });
       setIsEdited(false);
       setIsEditing(false);
       setResolveTarget(null);

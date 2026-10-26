@@ -4,6 +4,13 @@ import { test } from "node:test";
 
 import { reconcileCritique } from "../src/lib/reconcile.ts";
 import type { Finding, Scope } from "../src/lib/schema.ts";
+import {
+  compatibleClaims,
+  conditionalVendorIntegration,
+  differentDomainCompatibleClaims,
+  excludedButRequired,
+  requiredButExcluded,
+} from "./fixtures/reconciliation-scenarios.ts";
 
 async function loadTranscript(): Promise<string> {
   return readFile(new URL("../samples/northstar-dental-transcript.txt", import.meta.url), "utf8");
@@ -160,7 +167,10 @@ test("invalid reconciled scope fails closed instead of returning a validated rep
       generateScope: async () => invalid,
       critiqueScope: async () => [],
     }),
-    /conflicts with the source/i,
+    (error: unknown) =>
+      error instanceof Error &&
+      error.name === "ScopeReconciliationError" &&
+      error.message.includes("could not be validated"),
   );
 });
 
@@ -185,6 +195,136 @@ test("a remaining finding cannot validate a still-confirmed conflicting decision
       generateScope: async () => badScope,
       critiqueScope: async () => [remainingFinding],
     }),
-    /conflicts with the source/i,
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.name, "ScopeReconciliationError");
+      assert.match(error.message, /marks a decision as confirmed/i);
+      assert.match(error.message, /previous results are unchanged/i);
+      assert.doesNotMatch(error.message, /change your source/i);
+      return true;
+    },
+  );
+});
+
+test("UrbanNest room categories are not confused with undecided product filters", async () => {
+  const result = await reconcileCritique(compatibleClaims.transcript, compatibleClaims.scope, [compatibleClaims.finding], {}, {
+    generateScope: async () => compatibleClaims.scope,
+    critiqueScope: async () => [compatibleClaims.finding],
+  });
+
+  assert.equal(result.reconciled, true);
+  assert.equal(result.scope.openQuestions[0].status, "unresolved");
+  assert.equal(result.scope.inScope[0].status, "confirmed");
+});
+
+test("an explicit exclusion conflicts with the same feature as a required deliverable", async () => {
+  await assert.rejects(
+    reconcileCritique(excludedButRequired.transcript, excludedButRequired.scope, [excludedButRequired.finding], {}, {
+      generateScope: async () => excludedButRequired.scope,
+      critiqueScope: async () => [excludedButRequired.finding],
+    }),
+    (error: unknown) => error instanceof Error && error.name === "ScopeReconciliationError",
+  );
+});
+
+test("a required archive feature cannot remain marked excluded", async () => {
+  await assert.rejects(
+    reconcileCritique(requiredButExcluded.transcript, requiredButExcluded.scope, [requiredButExcluded.finding], {}, {
+      generateScope: async () => requiredButExcluded.scope,
+      critiqueScope: async () => [requiredButExcluded.finding],
+    }),
+    (error: unknown) => error instanceof Error && error.name === "ScopeReconciliationError",
+  );
+});
+
+test("a conditional vendor integration is not treated as guaranteed or contradictory", async () => {
+  const conditionalFinding: Finding = {
+    ...conditionalVendorIntegration.finding,
+    description: "Payroll synchronization is marked confirmed despite unresolved LedgerPro API access.",
+  };
+  const result = await reconcileCritique(
+    conditionalVendorIntegration.transcript,
+    conditionalVendorIntegration.scope,
+    [conditionalFinding],
+    {},
+    {
+      generateScope: async () => conditionalVendorIntegration.scope,
+      critiqueScope: async () => [conditionalFinding],
+    },
+  );
+
+  assert.equal(result.reconciled, true);
+  assert.match(result.scope.requirements[0].text, /only after/i);
+  assert.equal(result.scope.requirements[0].status, "confirmed");
+  assert.equal(result.scope.openQuestions[0].status, "unresolved");
+});
+
+test("different-domain adjacent decisions remain separate", async () => {
+  const result = await reconcileCritique(
+    differentDomainCompatibleClaims.transcript,
+    differentDomainCompatibleClaims.scope,
+    [differentDomainCompatibleClaims.finding],
+    {},
+    {
+      generateScope: async () => differentDomainCompatibleClaims.scope,
+      critiqueScope: async () => [differentDomainCompatibleClaims.finding],
+    },
+  );
+
+  assert.equal(result.reconciled, true);
+  assert.match(result.scope.requirements[0].text, /crew assignments/i);
+  assert.match(result.scope.openQuestions[0].text, /mobile numbers/i);
+});
+
+test("a cited explicit exclusion is not mistaken for a confirmed included feature", async () => {
+  const transcript = await loadTranscript();
+  const exclusionFinding: Finding = {
+    type: "unsupported-assumption",
+    description: "The scope includes patient accounts even though the source explicitly excludes them.",
+    whyItMatters: "Patient account handling would expand privacy obligations.",
+    sourceSnippet: "Patient accounts and access to or storage of medical records are explicitly excluded.",
+  };
+  const scopeWithExclusion = {
+    ...correctedScope,
+    inScope: correctedScope.inScope.filter((item) => !/patient accounts/i.test(item.text)),
+    outOfScope: [
+      { text: "Patient accounts and medical records are excluded.", status: "confirmed" as const, sourceQuote: "Patient accounts and access to or storage of medical records are explicitly excluded." },
+    ],
+  };
+
+  const result = await reconcileCritique(transcript, scopeWithExclusion, [exclusionFinding], {}, {
+    generateScope: async () => scopeWithExclusion,
+    critiqueScope: async () => [exclusionFinding],
+  });
+
+  assert.equal(result.scope.outOfScope[0].status, "confirmed");
+  assert.equal(result.scope.inScope.some((item) => /patient accounts/i.test(item.text)), false);
+});
+
+test("a confirmed feature still cannot remain falsely excluded", async () => {
+  const transcript = "The UrbanNest launch must include online appointment booking.";
+  const excludedBooking: Scope = {
+    ...correctedScope,
+    inScope: [],
+    outOfScope: [
+      { text: "Online appointment booking is excluded from launch.", status: "confirmed", sourceQuote: "The UrbanNest launch must include online appointment booking." },
+    ],
+  };
+  const finding: Finding = {
+    type: "unsupported-assumption",
+    description: "The scope excludes online appointment booking even though the client explicitly required it.",
+    whyItMatters: "The launch scope would omit a required feature.",
+    sourceSnippet: "The UrbanNest launch must include online appointment booking.",
+  };
+
+  await assert.rejects(
+    reconcileCritique(transcript, excludedBooking, [finding], {}, {
+      generateScope: async () => excludedBooking,
+      critiqueScope: async () => [finding],
+    }),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.name === "ScopeReconciliationError" &&
+      error.message.includes("marks a decision as confirmed"),
   );
 });
