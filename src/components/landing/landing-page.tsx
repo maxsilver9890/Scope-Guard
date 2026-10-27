@@ -1943,30 +1943,27 @@ function FinalCta() {
 
 function Footer() {
   return (
-    <footer className="border-t border-navy/8 bg-white/70">
-      <div className="mx-auto w-full max-w-[1220px] px-5 py-10 sm:px-8 sm:py-12">
-        <div className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+    <footer className="border-t border-navy/8 bg-[radial-gradient(760px_360px_at_50%_100%,rgba(233,229,255,0.75),transparent_72%),linear-gradient(180deg,rgba(255,255,255,0.82)_0%,#f8f7ff_100%)]">
+      <div className="mx-auto w-full max-w-[1220px] px-5 py-12 sm:px-8 sm:py-14">
+        <div className="grid gap-10 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
           <div>
             <div className="flex items-center gap-2.5">
-              <BrandMark size={32} />
-              <span className="font-display text-[20px] tracking-[-0.02em] text-navy">
+              <BrandMark size={34} />
+              <span className="font-display text-[22px] tracking-[-0.02em] text-navy">
                 Scope Guard
               </span>
             </div>
-            <p className="mt-3 max-w-[34ch] text-[11px] leading-5 text-slatebody">
+            <p className="mt-3.5 max-w-[36ch] text-[13.5px] leading-6 text-slatebody">
               Evidence-backed project scoping. Turn discovery conversations
               into commitments you can inspect.
-            </p>
-            <p className="mt-4 inline-flex items-center rounded-full border border-navy/8 bg-cream px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-navy/50">
-              Built for the OpenFire Hackathon
             </p>
           </div>
 
           <nav aria-label="Footer sections">
-            <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-navy/40">
+            <p className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-navy/45">
               Explore
             </p>
-            <ul className="mt-3 grid gap-2">
+            <ul className="mt-4 grid gap-2.5">
               {[
                 ["The Problem", "#problem"],
                 ["The Solution", "#solution"],
@@ -1977,7 +1974,7 @@ function Footer() {
                 <li key={label}>
                   <a
                     href={href}
-                    className="text-[11px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   >
                     {label}
                   </a>
@@ -1987,14 +1984,14 @@ function Footer() {
           </nav>
 
           <div>
-            <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-navy/40">
+            <p className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-navy/45">
               Project
             </p>
-            <ul className="mt-3 grid gap-2">
+            <ul className="mt-4 grid gap-2.5">
               <li>
                 <a
                   href="#tech-stack"
-                  className="text-[11px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   Tech Stack
                 </a>
@@ -2004,7 +2001,7 @@ function Footer() {
                   href={GITHUB_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   GitHub Repository ↗
                 </a>
@@ -2012,7 +2009,7 @@ function Footer() {
               <li>
                 <Link
                   href="/workspace"
-                  className="text-[11px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   Open the workspace
                 </Link>
@@ -2021,34 +2018,28 @@ function Footer() {
           </div>
         </div>
 
-        <div className="mt-9 flex flex-col gap-2 border-t border-navy/8 pt-5 text-[9px] text-slatebody/75 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 border-t border-navy/8 pt-10 text-center sm:pt-12">
+          <span className="inline-flex items-center gap-2 rounded-full border border-brand/15 bg-white/65 px-3.5 py-1.5 text-[9.5px] font-bold uppercase tracking-[0.2em] text-brand">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 rounded-full bg-brand/75"
+            />
+            OpenFire Hackathon 2026
+          </span>
+          <p className="mx-auto mt-5 max-w-[900px] font-display text-[clamp(2rem,4.4vw,3.4rem)] leading-[1.04] tracking-[-0.035em] text-navy">
+            Made with <span className="text-brand">Alan AI</span> for the
+            OpenFire Hackathon.
+          </p>
+          <p className="mx-auto mt-4 max-w-[58ch] text-[13px] leading-7 text-slatebody">
+            Conceived, built, tested, and shipped end-to-end with Alan&apos;s AI
+            software factory.
+          </p>
+        </div>
+
+        <div className="mt-10 flex flex-col gap-2 border-t border-navy/8 pt-5 text-[11.5px] text-slatebody/80 sm:flex-row sm:items-center sm:justify-between">
           <p>Scope Guard — evidence-backed project scoping.</p>
           <p>Human review stays in the loop.</p>
         </div>
-      </div>
-    </footer>
-  );
-}
-
-function AttributionFooter() {
-  return (
-    <footer aria-label="Project attribution" className="border-t border-navy/8 bg-white/45">
-      <div className="mx-auto w-full max-w-[1220px] px-5 py-5 sm:px-8">
-        <p className="group flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[10px] leading-5 tracking-[0.01em] text-slatebody/80">
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand/70 transition-transform duration-300 group-hover:scale-125 motion-reduce:transform-none"
-          />
-          <span>
-            <span className="font-medium text-brand/90 transition-colors duration-200 group-hover:text-brand">
-              Built with Alan AI
-            </span>
-            <span className="px-1 text-slatebody/50" aria-hidden="true">
-              ·
-            </span>
-            <span>Created for OpenFire Hackathon 2026</span>
-          </span>
-        </p>
       </div>
     </footer>
   );
@@ -2072,7 +2063,6 @@ export function LandingPage() {
         <FinalCta />
       </main>
       <Footer />
-      <AttributionFooter />
     </div>
   );
 }
