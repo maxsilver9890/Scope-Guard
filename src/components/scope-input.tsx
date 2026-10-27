@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { isSourceTextAnalyzable, resolveTranscriptHandoff, transcribeAndPrepareHandoff, type TranscriptChoice } from "@/lib/source-text";
+import { analyzeButtonLabel } from "@/lib/analysis-state";
 
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 const MAX_RECORDING_MS = 15 * 60 * 1000;
@@ -15,14 +16,15 @@ type Props = {
   analysisError: string | null;
   isAnalyzing: boolean;
   isResolving: boolean;
+  hasAnalysis: boolean;
   statusDot: string;
   sourceStatus: string;
 };
 
-const MODES: { id: InputMode; label: string }[] = [
-  { id: "paste", label: "Paste Text" },
-  { id: "record", label: "Record Conversation" },
-  { id: "upload", label: "Upload Recording" },
+const MODES: { id: InputMode; label: string; shortLabel: string }[] = [
+  { id: "paste", label: "Paste Text", shortLabel: "Paste" },
+  { id: "record", label: "Record Conversation", shortLabel: "Record" },
+  { id: "upload", label: "Upload Recording", shortLabel: "Upload" },
 ];
 
 const MODE_DESCRIPTIONS: Record<InputMode, string> = {
@@ -63,6 +65,7 @@ export function ScopeInput({
   analysisError,
   isAnalyzing,
   isResolving,
+  hasAnalysis,
   statusDot,
   sourceStatus,
 }: Props) {
@@ -362,18 +365,20 @@ export function ScopeInput({
 
   return (
     <form onSubmit={handleSubmit} className="px-5 pb-5 pt-5 sm:px-6">
-      <div className="grid grid-cols-1 gap-1 rounded-xl border border-line/70 bg-slate-50/70 p-1 sm:grid-cols-3" role="tablist" aria-label="Source input method">
+      <div className="grid grid-cols-3 gap-1 rounded-xl border border-line/70 bg-slate-50/70 p-1" role="tablist" aria-label="Source input method">
         {MODES.map((item) => (
           <button
             key={item.id}
             type="button"
             role="tab"
             aria-selected={mode === item.id}
+            aria-label={item.label}
             disabled={isRecording || isTranscribing}
             onClick={() => selectMode(item.id)}
-            className={`min-h-9 rounded-lg px-2 py-2 text-[10px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${mode === item.id ? "bg-white text-forest shadow-sm" : "text-muted hover:bg-white/70 hover:text-forest"}`}
+            className={`min-h-9 rounded-lg px-1.5 py-2 text-[10px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 sm:px-2 ${mode === item.id ? "bg-white text-forest shadow-sm" : "text-muted hover:bg-white/70 hover:text-forest"}`}
           >
-            {item.label}
+            <span className="sm:hidden">{item.shortLabel}</span>
+            <span className="hidden sm:inline">{item.label}</span>
           </button>
         ))}
       </div>
@@ -442,16 +447,13 @@ export function ScopeInput({
         rows={16}
         spellCheck={false}
         placeholder={mode === "paste" ? "Paste a discovery transcript, meeting notes, or a rough project brief…" : "Transcribe a recording or add written context here…"}
-        aria-describedby={`source-helper source-text-helper transcription-privacy${canAnalyze ? "" : " source-empty-message"}`}
+        aria-describedby={`source-helper transcription-privacy${canAnalyze ? "" : " source-empty-message"}`}
         className="mt-2.5 block max-h-[70vh] min-h-[300px] w-full resize-y rounded-md border border-line bg-white px-4 py-3.5 font-sans text-[13px] leading-[1.75] text-ink/90 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-colors duration-200 placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft sm:min-h-[380px]"
       />
 
       <p id="source-helper" className="mt-2.5 flex items-center gap-2 text-[11px] text-muted">
         <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
         <span>Source brief · {sourceStatus}</span>
-      </p>
-      <p id="source-text-helper" className="mt-2 text-[11px] leading-5 text-muted">
-        This is the text Scope Guard will analyze. You can edit the transcript or add relevant written context before analyzing.
       </p>
 
       {isTranscribing ? (
@@ -511,17 +513,17 @@ export function ScopeInput({
         </p>
       ) : null}
 
-      <p className="mt-4 text-center text-[10.5px] leading-5 text-muted/80">
-        Scope Guard analyzes the text in the source field below.
-      </p>
-
       <button
         type="submit"
         disabled={isAnalyzing || isResolving || isTranscribing || !canAnalyze}
         aria-busy={isAnalyzing}
         className="group mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-accent px-5 text-[13px] font-medium tracking-[0.01em] text-white shadow-[0_1px_2px_rgba(79,70,229,0.3),0_10px_24px_-14px_rgba(79,70,229,0.7)] transition-colors duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-accent/45 disabled:text-white/80"
       >
-        {isAnalyzing ? <><Spinner />Analyzing brief…</> : <>Analyze<AnalyzeArrow /></>}
+        {isAnalyzing ? (
+          <><Spinner />{analyzeButtonLabel(isAnalyzing, hasAnalysis)}</>
+        ) : (
+          <>{analyzeButtonLabel(isAnalyzing, hasAnalysis)}<AnalyzeArrow /></>
+        )}
       </button>
       <p className="mt-3 text-center text-[10.5px] leading-5 text-muted/80">One extraction pass · One Scope Guard review</p>
     </form>

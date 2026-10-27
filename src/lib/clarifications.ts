@@ -93,6 +93,13 @@ export function getPdfExportPreflight(
 export type PdfExportIntent = "download" | "review" | "download-anyway";
 export type PdfExportOutcome = "warning" | "review" | "download";
 
+/** Concise, count-aware title for the PDF preflight warning. */
+export function pdfPreflightTitle(count: number): string {
+  return count === 1
+    ? "1 open question remains"
+    : `${count} open questions remain`;
+}
+
 export function formatPdfPreflightSummary(
   preflight: ReturnType<typeof getPdfExportPreflight>,
 ): string {

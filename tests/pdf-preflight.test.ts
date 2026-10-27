@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { formatPdfPreflightSummary, getPdfExportPreflight, runPdfExportIntent } from "../src/lib/clarifications.ts";
+import { formatPdfPreflightSummary, getPdfExportPreflight, pdfPreflightTitle, runPdfExportIntent } from "../src/lib/clarifications.ts";
 import type { Scope } from "../src/lib/schema.ts";
 
 function testScope(): Scope {
@@ -246,4 +246,10 @@ test("a fully resolved scope downloads without a warning", () => {
 
   assert.equal(outcome, "download");
   assert.deepEqual(events, ["download"]);
+});
+
+test("the PDF warning title reflects the actual unresolved question count", () => {
+  assert.equal(pdfPreflightTitle(1), "1 open question remains");
+  assert.equal(pdfPreflightTitle(2), "2 open questions remain");
+  assert.equal(pdfPreflightTitle(8), "8 open questions remain");
 });

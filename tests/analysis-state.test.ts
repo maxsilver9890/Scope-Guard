@@ -1,10 +1,14 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  analysisLoadingMessages,
   analysisRequestBody,
   analysisResultsReducer,
+  ANALYSIS_LOADING_INTERVAL_MS,
+  analyzeButtonLabel,
   EMPTY_ANALYSIS_RESULTS,
+  nextAnalysisLoadingStep,
 } from "../src/lib/analysis-state.ts";
 import type { Scope } from "../src/lib/schema.ts";
 
@@ -77,4 +81,35 @@ test("a retry after a failed attempt commits only the retry response", () => {
   assert.equal(afterFailure, previous);
   assert.equal(afterRetry.scope, newScope);
   assert.equal(afterRetry.analyzedInput, "retry source");
+});
+
+test("the analyze action reflects whether results already exist", () => {
+  assert.equal(analyzeButtonLabel(false, false), "Analyze");
+  assert.equal(analyzeButtonLabel(false, true), "Re-analyze");
+  assert.equal(analyzeButtonLabel(true, false), "Analyzing brief\u2026");
+  assert.equal(analyzeButtonLabel(true, true), "Re-analyzing brief\u2026");
+});
+
+test("loading guidance is indicative and never promises a percentage", () => {
+  const initial = analysisLoadingMessages(false);
+  const reanalysis = analysisLoadingMessages(true);
+
+  assert.deepEqual(initial, [
+    "Preparing source material",
+    "Generating structured scope",
+    "Reviewing assumptions and gaps",
+    "Validating scope consistency",
+  ]);
+  assert.equal(reanalysis.length, initial.length);
+  assert.equal(reanalysis[0], "Re-reading the updated source");
+  assert.ok(ANALYSIS_LOADING_INTERVAL_MS >= 5_000);
+  for (const message of [...initial, ...reanalysis]) {
+    assert.doesNotMatch(message, /%|complete|finished|done/i);
+  }
+});
+
+test("the loading step stops at the final message", () => {
+  assert.equal(nextAnalysisLoadingStep(0, 4), 1);
+  assert.equal(nextAnalysisLoadingStep(2, 4), 3);
+  assert.equal(nextAnalysisLoadingStep(3, 4), 3);
 });

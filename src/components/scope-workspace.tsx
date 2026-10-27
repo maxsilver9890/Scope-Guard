@@ -12,13 +12,16 @@ import {
 import { downloadScopePdf } from "@/lib/pdf-export";
 import { distinctDecisionStatusCounts } from "@/lib/commitments";
 import {
+  analysisLoadingMessages,
   analysisRequestBody,
   analysisResultsReducer,
+  ANALYSIS_LOADING_INTERVAL_MS,
   EMPTY_ANALYSIS_RESULTS,
+  nextAnalysisLoadingStep,
 } from "@/lib/analysis-state";
 import {
-  formatPdfPreflightSummary,
   getPdfExportPreflight,
+  pdfPreflightTitle,
   runPdfExportIntent,
 } from "@/lib/clarifications";
 import { ScopeInput } from "@/components/scope-input";
@@ -113,6 +116,8 @@ const STATUS_STYLES: Record<
 };
 
 const FALLBACK_BADGE = "border-line bg-canvas text-muted";
+const BADGE_BASE =
+  "inline-flex min-h-[22px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-1 text-[9px] font-semibold uppercase leading-none tracking-[0.08em]";
 
 const TOOLBAR_BUTTON =
   "inline-flex h-9 items-center gap-2 rounded-xl border border-line/80 bg-white/70 px-3 text-[11px] font-medium text-forest transition-all duration-200 hover:border-accent/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
@@ -230,41 +235,109 @@ function DownloadIcon() {
   );
 }
 
-function EmptyMotif() {
+function EmptyStepIcon({ step }: { step: 1 | 2 | 3 }) {
   return (
     <svg
-      width="92"
-      height="92"
-      viewBox="0 0 92 92"
+      viewBox="0 0 20 20"
       fill="none"
       aria-hidden="true"
+      className="h-4 w-4"
     >
-      <rect
-        x="12.5"
-        y="12.5"
-        width="67"
-        height="67"
-        rx="2"
-        stroke="#1B2440"
-        strokeOpacity="0.16"
-      />
-      <rect
-        x="26.5"
-        y="26.5"
-        width="39"
-        height="39"
-        rx="1"
-        stroke="#1B2440"
-        strokeOpacity="0.24"
-        strokeDasharray="2 4"
-      />
-      <path
-        d="M12.5 46h12M67.5 46h12M46 12.5v12M46 67.5v12"
-        stroke="#1B2440"
-        strokeOpacity="0.22"
-      />
-      <circle cx="46" cy="46" r="3" fill="#4F46E5" />
+      {step === 1 ? (
+        <>
+          <path
+            d="M5 3.5h6.5L15 7v9.5H5v-13Z"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M11.5 3.5V7H15M7.5 10h5M7.5 12.5h3.5"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+          />
+        </>
+      ) : step === 2 ? (
+        <>
+          <path
+            d="m10 3.2 6 3.2-6 3.2-6-3.2 6-3.2Z"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinejoin="round"
+          />
+          <path
+            d="m4 10 6 3.2 6-3.2M4 13.2l6 3.2 6-3.2"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      ) : (
+        <>
+          <path
+            d="M10 3.2 16 5.6v4.8c0 3.4-2.4 5.7-6 6.9-3.6-1.2-6-3.5-6-6.9V5.6l6-2.4Z"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinejoin="round"
+          />
+          <path
+            d="m7.2 10.2 1.8 1.8 3.8-4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
     </svg>
+  );
+}
+
+const EMPTY_STEPS = [
+  {
+    step: 1 as const,
+    title: "Add your source",
+    copy: "Paste a discovery conversation or project brief.",
+  },
+  {
+    step: 2 as const,
+    title: "Analyze the brief",
+    copy: "Scope Guard structures the requirements.",
+  },
+  {
+    step: 3 as const,
+    title: "Review the results",
+    copy: "Inspect the scope, evidence, potential risks, and unanswered questions.",
+  },
+];
+
+function EmptySteps() {
+  return (
+    <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
+      {EMPTY_STEPS.map((entry) => (
+        <div
+          key={entry.step}
+          className="relative rounded-xl border border-line/70 bg-white/70 p-4"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/15 bg-accent-soft text-accent">
+              <EmptyStepIcon step={entry.step} />
+            </span>
+            <span className="font-mono text-[9px] font-semibold tracking-[0.14em] text-muted/60">
+              0{entry.step}
+            </span>
+          </div>
+          <h3 className="mt-3 text-[12px] font-semibold text-forest">
+            {entry.title}
+          </h3>
+          <p className="mt-1.5 text-[10.5px] leading-5 text-muted">
+            {entry.copy}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -272,7 +345,7 @@ function StatusBadge({ status }: { status: string }) {
   const style = STATUS_STYLES[status];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9.5px] font-semibold uppercase leading-none tracking-[0.08em] ${
+      className={`${BADGE_BASE} ${
         style?.badge ?? FALLBACK_BADGE
       }`}
     >
@@ -340,7 +413,7 @@ function EmptyNote() {
 function ClarificationStateBadge({ confirmed }: { confirmed: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase leading-none tracking-[0.08em] ${
+      className={`${BADGE_BASE} ${
         confirmed
           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
           : "border-slate-200 bg-slate-100 text-slate-600"
@@ -356,6 +429,67 @@ function ClarificationStateBadge({ confirmed }: { confirmed: boolean }) {
     </span>
   );
 }
+
+function AnalysisProgress({
+  hasResults,
+  compact = false,
+}: {
+  hasResults: boolean;
+  compact?: boolean;
+}) {
+  const messages = analysisLoadingMessages(hasResults);
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setIndex((current) =>
+        nextAnalysisLoadingStep(current, messages.length),
+      );
+    }, ANALYSIS_LOADING_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [messages.length]);
+
+  if (compact) {
+    return (
+      <div className="flex items-start gap-2.5 rounded-md border border-line bg-surface px-3.5 py-2.5">
+        <Spinner className="mt-0.5 h-3.5 w-3.5 text-forest/70" />
+        <div>
+          <p
+            role="status"
+            aria-live="polite"
+            className="text-[11px] text-forest/80"
+          >
+            {messages[index]}
+          </p>
+          <p className="mt-0.5 text-[10px] leading-4 text-muted">
+            Previous results remain visible. This can take 60–90 seconds.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-[460px] flex-col items-center justify-center rounded-xl border border-line bg-surface px-8 py-16 text-center lg:min-h-[560px]">
+      <Spinner className="h-7 w-7 text-forest/60" />
+      <p className="mt-6 text-[9.5px] font-medium uppercase tracking-[0.24em] text-brass">
+        {hasResults ? "Re-analyzing source" : "Running analysis"}
+      </p>
+      <p
+        role="status"
+        aria-live="polite"
+        className="mt-3 font-serif text-[22px] text-forest"
+      >
+        {messages[index]}
+      </p>
+      <p className="mt-2 max-w-sm text-[12.5px] leading-6 text-muted">
+        Analysis can take 60–90 seconds because Scope Guard runs generation, a
+        separate review, and consistency validation.
+      </p>
+    </div>
+  );
+}
+
 
 function ScopeItemList({
   items,
@@ -1082,6 +1216,9 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   const isAnalyzing = status === "loading";
   const hasResults =
     scope !== null && editedScope !== null && findings !== null;
+  const sourceChanged = Boolean(
+    analyzedInput && input.trim() !== analyzedInput,
+  );
   const statusCounts =
     hasResults && editedScope ? distinctDecisionStatusCounts(editedScope) : null;
   const pdfPreflight = editedScope
@@ -1102,7 +1239,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             label: "Acceptance Criteria",
             icon: "acceptance",
           },
-          { id: "risks", label: "Delivery Risks", icon: "risks" },
+          { id: "risks", label: "Scope Guard Review", icon: "risks" },
           ...(editedScope.clarifications.length > 0
             ? [
                 {
@@ -1167,9 +1304,13 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
 
   const sourceStatus =
     status === "loading"
-      ? "Analyzing"
+      ? hasResults
+        ? "Re-analyzing source"
+        : "Analyzing"
       : status === "success"
-        ? "Analysis complete"
+        ? sourceChanged
+          ? "Source changed since analysis"
+          : "Analysis complete"
         : status === "error"
           ? "Analysis failed"
           : "Ready to analyze";
@@ -1178,7 +1319,9 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     status === "loading"
       ? "bg-amber-400"
       : status === "success"
-        ? "bg-emerald-500"
+        ? sourceChanged
+          ? "bg-amber-400"
+          : "bg-emerald-500"
         : status === "error"
           ? "bg-rose-500"
           : "bg-accent";
@@ -1468,19 +1611,20 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-2xl"
           >
             <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-700">
-              Before you export
+              PDF preflight
             </p>
             <h2
               id="pdf-pending-questions-title"
               className="mt-2 font-serif text-2xl leading-tight text-forest"
             >
-              Some questions remain unresolved
+              {pdfPreflightTitle(pdfPreflight.count)}
             </h2>
             <p
               id="pdf-pending-questions-description"
               className="mt-3 text-[13px] leading-6 text-muted"
             >
-              {formatPdfPreflightSummary(pdfPreflight)} Resolving them may improve the report. Review the questions or download the current draft with its open issues clearly shown.
+              Review them for a more complete scope, or download the current
+              draft with unresolved items clearly identified.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <button
@@ -1508,7 +1652,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                 ref={downloadAnywayButtonRef}
                 className={TOOLBAR_PRIMARY}
               >
-                Download anyway
+                Download draft
               </button>
             </div>
           </div>
@@ -1560,11 +1704,6 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             >
               Project brief
             </h2>
-            <p className="mt-2 max-w-[44ch] text-[12.5px] leading-6 text-muted">
-              Paste a client conversation, meeting transcript, or rough project
-              description. Scope Guard will separate what was confirmed from
-              what still needs a decision.
-            </p>
           </div>
 
           <ScopeInput
@@ -1574,6 +1713,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             analysisError={error}
             isAnalyzing={isAnalyzing}
             isResolving={isResolving}
+            hasAnalysis={hasResults}
             statusDot={statusDot}
             sourceStatus={sourceStatus}
           />
@@ -1587,48 +1727,25 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
 
         {!hasResults ? (
           isAnalyzing ? (
-            <div className="flex min-h-[460px] flex-col items-center justify-center rounded-xl border border-line bg-surface px-8 py-16 text-center lg:min-h-[620px]">
-              <Spinner className="h-7 w-7 text-forest/60" />
-              <p className="mt-6 text-[9.5px] font-medium uppercase tracking-[0.24em] text-brass">
-                Running analysis
-              </p>
-              <p className="mt-3 font-serif text-[22px] text-forest">
-                Reading the source material
-              </p>
-              <p className="mt-2 max-w-xs text-[12.5px] leading-6 text-muted">
-                Extracting only supported commitments, then reviewing the
-                document for gaps and unsupported assumptions.
-              </p>
-            </div>
+            <AnalysisProgress hasResults={false} />
           ) : (
-            <div className="flex min-h-[460px] flex-col items-center justify-center rounded-xl border border-line bg-surface px-8 py-16 text-center lg:min-h-[620px]">
-              <EmptyMotif />
-              <p className="mt-7 text-[9.5px] font-medium uppercase tracking-[0.24em] text-brass">
-                Your analysis will appear here
-              </p>
-              <p className="mt-3 max-w-sm text-[13px] leading-6 text-muted">
-                A structured scope document that separates confirmed
-                commitments from proposals, plus a focused review of delivery
-                risks.
-              </p>
-              <div className="mt-8 flex items-center gap-3 text-[9px] font-medium uppercase tracking-[0.18em] text-muted/70">
-                <span>Scope document</span>
-                <span aria-hidden="true" className="h-px w-5 bg-line" />
-                <span>Scope Guard review</span>
+            <div className="flex min-h-[460px] flex-col justify-center rounded-xl border border-line bg-surface px-5 py-10 text-center sm:px-8 lg:min-h-[560px]">
+              <div className="mx-auto max-w-xl">
+                <p className="text-[9.5px] font-medium uppercase tracking-[0.24em] text-brass">
+                  Your analysis will appear here
+                </p>
+                <p className="mt-3 font-serif text-[24px] leading-tight text-forest sm:text-[27px]">
+                  From conversation to reviewable scope
+                </p>
+              </div>
+              <div className="mx-auto w-full max-w-2xl">
+                <EmptySteps />
               </div>
             </div>
           )
         ) : (
           <div className="space-y-7">
-            {isAnalyzing ? (
-              <div
-                role="status"
-                className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3.5 py-2.5 text-[11px] text-muted"
-              >
-                <Spinner className="h-3.5 w-3.5 text-forest/70" />
-                <span>Updating analysis… previous results remain visible.</span>
-              </div>
-            ) : null}
+            {isAnalyzing ? <AnalysisProgress hasResults compact /> : null}
 
             <article
               aria-labelledby="scope-doc-heading"
@@ -1904,16 +2021,16 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               <div className="flex flex-wrap items-end justify-between gap-4 px-1">
                 <div>
                   <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-brass">
-                    02 / Scope Guard
+                    02 / Independent review
                   </p>
                   <h2
                     id="findings-heading"
                     className="mt-2 font-serif text-[26px] leading-tight tracking-[-0.01em] text-forest"
                   >
-                    Potential delivery risks
+                    Scope Guard Review
                   </h2>
                   <p className="mt-1.5 text-[12.5px] leading-5 text-muted">
-                    Issues to resolve before committing to the scope.
+                    Potential issues to resolve before committing to scope.
                   </p>
                   {isEdited ? (
                     <p className="mt-2 text-[11px] leading-5 text-amber-800">
