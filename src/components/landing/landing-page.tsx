@@ -1902,6 +1902,30 @@ function Footer() {
   );
 }
 
+function AttributionFooter() {
+  return (
+    <footer aria-label="Project attribution" className="border-t border-navy/8 bg-white/45">
+      <div className="mx-auto w-full max-w-[1220px] px-5 py-5 sm:px-8">
+        <p className="group flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[10px] leading-5 tracking-[0.01em] text-slatebody/80">
+          <span
+            aria-hidden="true"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand/70 transition-transform duration-300 group-hover:scale-125 motion-reduce:transform-none"
+          />
+          <span>
+            <span className="font-medium text-brand/90 transition-colors duration-200 group-hover:text-brand">
+              Built with Alan AI
+            </span>
+            <span className="px-1 text-slatebody/50" aria-hidden="true">
+              ·
+            </span>
+            <span>Created for OpenFire Hackathon 2026</span>
+          </span>
+        </p>
+      </div>
+    </footer>
+  );
+}
+
 export function LandingPage() {
   return (
     <div id="top" className="landing-shell min-h-screen bg-cream text-navy">
@@ -1920,6 +1944,7 @@ export function LandingPage() {
         <FinalCta />
       </main>
       <Footer />
+      <AttributionFooter />
     </div>
   );
 }
