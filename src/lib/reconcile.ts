@@ -28,6 +28,7 @@ export type ReconciliationFailureCategory =
 export type ReconciliationConflictDetail = {
   section: CommitmentSection;
   commitment: string;
+  finding: string;
 };
 
 export class ScopeReconciliationError extends Error {
@@ -93,6 +94,7 @@ function confirmedConflictsForFinding(
   // confirmed contradictions. An explicit exclusion must also not be read as
   // an included feature just because a critique mentions both directions.
   const minimumDecisionMatch = 0.24;
+  const minimumEvidenceDecisionMatch = 0.2;
   const description = finding.description.toLowerCase();
   const saysIncluded = /\b(?:include[ds]?|in scope|approv(?:ed|es)|confirm(?:ed|s)|require[ds]?|will offer|will support)\b/.test(description);
   const saysExcluded = /\b(?:exclud(?:e|es|ed)|out of scope|not included|omitted)\b/.test(description);
@@ -104,16 +106,22 @@ function confirmedConflictsForFinding(
   const itemConflicts = (item: ScopeItem) => {
     const directlyMatchesDecision =
       similarity(item.text, finding.description) >= minimumDecisionMatch;
+    // The critique description can mention adjacent decisions that share
+    // broad terms (such as payment). Require the quoted evidence to concern
+    // the same decision as the confirmed scope item as well.
+    const evidenceMatchesDecision =
+      similarity(item.text, finding.sourceSnippet) >= minimumEvidenceDecisionMatch;
     const conditionIsPartOfDecision =
       isConditional(item.text) || Boolean(item.sourceQuote && isConditional(item.sourceQuote));
 
-    return directlyMatchesDecision && (!conditionIsPartOfDecision || sourceExplicitlyBlocks);
+    return directlyMatchesDecision && evidenceMatchesDecision &&
+      (!conditionIsPartOfDecision || sourceExplicitlyBlocks);
   };
 
   const matches = (section: CommitmentSection) =>
     scope[section]
       .filter((item) => item.status === "confirmed" && itemConflicts(item))
-      .map((item) => ({ section, commitment: item.text }));
+      .map((item) => ({ section, commitment: item.text, finding: finding.description }));
 
   if (saysIncluded && saysUnsettled) {
     const includedConflicts = includedSections.flatMap(matches);
@@ -162,8 +170,18 @@ export async function reconcileCritique(
 
   const reviewed = await deps.critiqueScope(input, parsed.data, { clarifications });
   const verifiedFindings = enforceFindingProvenance(reviewed, corpus).findings;
+  // Unconfirmed notes are retained as context for review, but they are not
+  // client assertions and cannot by themselves prove that a prior confirmed
+  // commitment is false. Transcript evidence and confirmed notes remain
+  // eligible for the fatal conflict guard.
   const unaddressed = verifiedFindings
     .filter((finding) => finding.type === "contradiction" || finding.type === "unsupported-assumption")
+    .filter((finding) =>
+      finding.sourceKind === "transcript" ||
+      (finding.sourceKind === "clarification" && clarifications.some((clarification) =>
+        clarification.id === finding.clarificationId && clarification.confirmed,
+      )),
+    )
     .flatMap((finding) => confirmedConflictsForFinding(parsed.data, finding));
   const uniqueConflicts = [...new Map(
     unaddressed.map((conflict) => [`${conflict.section}:${conflict.commitment}`, conflict]),

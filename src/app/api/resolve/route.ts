@@ -46,7 +46,13 @@ export async function POST(request: Request) {
         stage: error.stage,
         category: error.category,
       });
-      return Response.json({ error: error.message }, { status: 422 });
+      return Response.json(
+        {
+          error: error.message,
+          ...(error.conflicts.length > 0 ? { conflicts: error.conflicts } : {}),
+        },
+        { status: 422 },
+      );
     }
 
     const message = error instanceof Error ? error.message : String(error);

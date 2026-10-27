@@ -12,6 +12,7 @@ import {
   resolveScope,
   type ResolveRequest,
 } from "../src/lib/resolve.ts";
+import { ScopeReconciliationError } from "../src/lib/reconcile.ts";
 import { formatClarificationsForReview } from "../src/lib/scope-format.ts";
 import type { Clarification, Finding, Scope } from "../src/lib/schema.ts";
 
@@ -346,6 +347,62 @@ test("resolveScope keeps an unconfirmed clarification out of confirmed commitmen
   );
 });
 
+test("an unconfirmed payment-provider note is recorded without promoting the provider", async () => {
+  const question = "Which payment gateway has been approved?";
+  const answer = "We may continue using our existing payment provider, but we want to compare its costs and capabilities before making a final selection. No payment gateway has been approved yet.";
+  const previous = scope({
+    inScope: [],
+    requirements: [{
+      text: "Payment gateway support is proposed.",
+      status: "proposed",
+      rationale: "The provider selection is still open.",
+    }],
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const generated: Scope = {
+    ...previous,
+    requirements: [{
+      text: "Payment gateway is the existing provider.",
+      status: "confirmed",
+      sourceQuote: "We may continue using our existing payment provider",
+    }],
+  };
+
+  const result = await resolveScope(request({
+    input: TRANSCRIPT,
+    scope: previous,
+    question,
+    answer,
+    confirmed: false,
+  }), deps(generated));
+
+  assert.equal(result.scope.requirements[0].status, "proposed");
+  assert.equal(result.scope.clarifications[0].confirmed, false);
+  assert.equal(result.scope.clarifications[0].answer, answer);
+  assert.equal(result.scope.openQuestions[0].status, "unresolved");
+});
+
+test("a tentative gateway answer that says no final choice was made stays unresolved", async () => {
+  const question = "Which payment gateway should the store use?";
+  const answer = "We may keep the current gateway, but we need to compare options. No final selection has been made.";
+  const previous = scope({
+    inScope: [],
+    requirements: [{ text: "Payment provider selection is proposed.", status: "proposed", rationale: "Needs client approval." }],
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const generated: Scope = {
+    ...previous,
+    requirements: [{ text: "Payment provider selection is proposed.", status: "proposed", rationale: "The client has not selected a provider." }],
+  };
+  const result = await resolveScope(request({
+    input: TRANSCRIPT, scope: previous, question, answer, confirmed: false,
+  }), deps(generated));
+
+  assert.equal(result.scope.openQuestions.some((entry) => entry.status === "unresolved"), true);
+  assert.equal(result.scope.clarifications[0].confirmed, false);
+  assert.equal(result.scope.requirements[0].status, "proposed");
+});
+
 test("resolveScope preserves existing clarifications and unrelated commitments", async () => {
   const existing: Clarification = {
     id: "old",
@@ -413,6 +470,42 @@ test("resolveScope propagates model failures without mutating the request", asyn
   );
 
   assert.deepEqual(base, snapshot);
+});
+
+test("a genuine transcript conflict fails without mutating the prior scope or note answer", async () => {
+  const input = "The store will use PayLane for checkout. PayLane checkout is explicitly out of scope.";
+  const answer = "We may continue using our existing payment provider, but we want to compare its costs and capabilities before making a final selection. No payment gateway has been approved yet.";
+  const question = "Which payment gateway should checkout use?";
+  const previous = scope({
+    inScope: [{
+      text: "PayLane checkout is confirmed.",
+      status: "confirmed",
+      sourceQuote: "The store will use PayLane for checkout.",
+    }],
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const base = request({ input, scope: previous, question, answer, confirmed: false });
+  const snapshot = JSON.parse(JSON.stringify(base));
+  const contradictoryFinding: Finding = {
+    type: "unsupported-assumption",
+    description: "PayLane checkout is confirmed despite an explicit exclusion.",
+    whyItMatters: "The scope cannot both require and exclude this gateway.",
+    sourceSnippet: "PayLane checkout is explicitly out of scope.",
+  };
+
+  await assert.rejects(
+    resolveScope(base, {
+      generateScope: async () => previous,
+      critiqueScope: async () => [contradictoryFinding],
+      newClarificationId: () => "gateway-note",
+    }),
+    (error: unknown) => error instanceof ScopeReconciliationError &&
+      error.conflicts.some((entry) => entry.commitment === "PayLane checkout is confirmed."),
+  );
+
+  assert.deepEqual(base, snapshot);
+  assert.equal(base.answer, answer);
+  assert.equal(base.scope.inScope[0].status, "confirmed");
 });
 
 test("resolveScope reports resolved, retained, and new findings", async () => {

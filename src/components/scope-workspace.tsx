@@ -149,6 +149,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function formatReconciliationConflicts(payload: unknown): string | null {
+  if (!isRecord(payload) || !Array.isArray(payload.conflicts)) return null;
+  const details = payload.conflicts.flatMap((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.section !== "string" ||
+      typeof entry.commitment !== "string" ||
+      typeof entry.finding !== "string"
+    ) return [];
+    const section = entry.section.replace(/[^a-zA-Z ]/g, "").slice(0, 48);
+    const commitment = entry.commitment.replace(/\s+/g, " ").slice(0, 280);
+    const finding = entry.finding.replace(/\s+/g, " ").slice(0, 280);
+    return commitment && finding
+      ? [`- ${section}: ${commitment}\n  Review finding: ${finding}`]
+      : [];
+  }).slice(0, 5);
+  return details.length > 0 ? `Flagged commitments:\n${details.join("\n")}` : null;
+}
+
 function Spinner({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -1394,9 +1413,12 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
           isRecord(payload) && typeof payload.error === "string"
             ? payload.error
             : null;
+        const reconciliationDetails = formatReconciliationConflicts(payload);
         throw new Error(
-          serverMessage ??
-            "The clarification could not be applied. Your current scope was not changed.",
+          [
+            serverMessage ?? "The clarification could not be applied. Your current scope was not changed.",
+            ...(reconciliationDetails ? [reconciliationDetails] : []),
+          ].join("\n\n"),
         );
       }
 

@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
+import { similarity } from "../src/lib/diff.ts";
 import { reconcileCritique, ScopeReconciliationError } from "../src/lib/reconcile.ts";
-import type { Finding, Scope } from "../src/lib/schema.ts";
+import type { Clarification, Finding, Scope } from "../src/lib/schema.ts";
 import {
   compatibleClaims,
   conditionalVendorIntegration,
@@ -203,6 +204,7 @@ test("a remaining finding cannot validate a still-confirmed conflicting decision
       assert.deepEqual(error.conflicts, [{
         section: "inScope",
         commitment: "Online appointment booking is the approved launch method.",
+        finding: remainingFinding.description,
       }]);
       return true;
     },
@@ -260,6 +262,138 @@ test("a conditional vendor integration is not treated as guaranteed or contradic
   assert.match(result.scope.requirements[0].text, /only after/i);
   assert.equal(result.scope.requirements[0].status, "confirmed");
   assert.equal(result.scope.openQuestions[0].status, "unresolved");
+});
+
+test("an unconfirmed gateway note cannot turn its wording overlap into a fatal conflict", async () => {
+  const answer = "We may continue using our existing payment provider, but we want to compare its costs and capabilities before making a final selection. No payment gateway has been approved yet.";
+  const clarification: Clarification = {
+    id: "gateway-note",
+    question: "Which payment gateway will be used?",
+    answer,
+    confirmed: false,
+  };
+  const paymentScope: Scope = {
+    problemStatement: "The store needs checkout payments.",
+    inScope: [{
+      text: "Payment gateway is the existing provider.",
+      status: "confirmed",
+      sourceQuote: "We selected our existing payment gateway.",
+    }],
+    outOfScope: [], assumptions: [],
+    openQuestions: [{ text: clarification.question, status: "unresolved" }],
+    requirements: [], acceptanceCriteria: [], clarifications: [clarification],
+  };
+  const noteFinding: Finding = {
+    type: "unsupported-assumption",
+    description: "Payment gateway is confirmed despite no gateway approved.",
+    whyItMatters: "The provider is still being reviewed.",
+    sourceSnippet: answer,
+  };
+
+  const result = await reconcileCritique(
+    "We selected our existing payment gateway.",
+    paymentScope,
+    [noteFinding],
+    { clarifications: [clarification] },
+    {
+      generateScope: async () => paymentScope,
+      critiqueScope: async () => [noteFinding],
+    },
+  );
+
+  assert.equal(result.reconciled, true);
+  assert.equal(result.scope.inScope[0].status, "confirmed");
+  assert.equal(result.scope.openQuestions[0].status, "unresolved");
+});
+
+test("a payment-gateway clarification cannot conflict with separate payment-confirmation behavior", async () => {
+  const transcript = "We send an online payment confirmation after each purchase.";
+  const answer = "We want to compare payment gateway costs before making a final selection. No payment gateway has been approved yet.";
+  const clarification: Clarification = {
+    id: "gateway-selection",
+    question: "Which payment gateway should be selected?",
+    answer,
+    confirmed: true,
+  };
+  const paymentScope: Scope = {
+    problemStatement: "The store needs an online checkout.",
+    inScope: [{
+      text: "Online payment confirmation is confirmed after each purchase.",
+      status: "confirmed",
+      sourceQuote: transcript,
+    }],
+    outOfScope: [], assumptions: [],
+    openQuestions: [{ text: clarification.question, status: "unresolved" }],
+    requirements: [], acceptanceCriteria: [], clarifications: [clarification],
+  };
+  const unrelatedFinding: Finding = {
+    type: "unsupported-assumption",
+    description: "Online payment confirmation is confirmed despite payment gateway selection being undecided.",
+    whyItMatters: "The payment choice still needs review.",
+    sourceSnippet: answer,
+  };
+
+  assert.ok(similarity(paymentScope.inScope[0].text, unrelatedFinding.description) >= 0.24);
+  assert.ok(similarity(paymentScope.inScope[0].text, unrelatedFinding.sourceSnippet) < 0.2);
+  const result = await reconcileCritique(
+    transcript,
+    paymentScope,
+    [unrelatedFinding],
+    { clarifications: [clarification] },
+    {
+      generateScope: async () => paymentScope,
+      critiqueScope: async () => [unrelatedFinding],
+    },
+  );
+
+  assert.equal(result.reconciled, true);
+  assert.equal(result.scope.inScope[0].status, "confirmed");
+  assert.equal(result.scope.openQuestions[0].status, "unresolved");
+});
+
+test("a confirmed clarification finding still blocks a directly conflicting confirmed gateway commitment", async () => {
+  const answer = "No payment gateway has been approved yet.";
+  const clarification: Clarification = {
+    id: "gateway-confirmed",
+    question: "Which payment gateway will be used?",
+    answer,
+    confirmed: true,
+  };
+  const paymentScope: Scope = {
+    problemStatement: "The store needs checkout payments.",
+    inScope: [{
+      text: "Payment gateway is the existing provider.",
+      status: "confirmed",
+      sourceQuote: "We selected our existing payment gateway.",
+    }],
+    outOfScope: [], assumptions: [],
+    openQuestions: [{ text: clarification.question, status: "unresolved" }],
+    requirements: [], acceptanceCriteria: [], clarifications: [clarification],
+  };
+  const conflict: Finding = {
+    type: "unsupported-assumption",
+    description: "Payment gateway is confirmed despite no gateway approved.",
+    whyItMatters: "The provider is still being reviewed.",
+    sourceSnippet: answer,
+  };
+
+  await assert.rejects(
+    reconcileCritique(
+      "We selected our existing payment gateway.",
+      paymentScope,
+      [conflict],
+      { clarifications: [clarification] },
+      {
+        generateScope: async () => paymentScope,
+        critiqueScope: async () => [conflict],
+      },
+    ),
+    (error: unknown) => error instanceof ScopeReconciliationError &&
+      error.conflicts.some((entry) =>
+        entry.commitment === "Payment gateway is the existing provider." &&
+        entry.finding === conflict.description,
+      ),
+  );
 });
 
 test("different-domain adjacent decisions remain separate", async () => {
