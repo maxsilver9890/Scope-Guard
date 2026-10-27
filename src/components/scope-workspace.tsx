@@ -117,13 +117,13 @@ const STATUS_STYLES: Record<
 
 const FALLBACK_BADGE = "border-line bg-canvas text-muted";
 const BADGE_BASE =
-  "inline-flex min-h-[22px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-1 text-[9px] font-semibold uppercase leading-none tracking-[0.08em]";
+  "inline-flex min-h-[22px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-1 text-[10.5px] font-semibold uppercase leading-none tracking-[0.08em]";
 
 const TOOLBAR_BUTTON =
-  "inline-flex h-9 items-center gap-2 rounded-xl border border-line/80 bg-white/70 px-3 text-[11px] font-medium text-forest transition-all duration-200 hover:border-accent/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+  "inline-flex h-9 items-center gap-2 rounded-xl border border-line/80 bg-white/70 px-3 text-[12.5px] font-medium text-forest transition-all duration-200 hover:border-accent/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
 
 const TOOLBAR_PRIMARY =
-  "inline-flex h-9 items-center gap-2 rounded-xl bg-accent px-3.5 text-[11px] font-medium text-white shadow-[0_1px_2px_rgba(79,70,229,0.28),0_8px_20px_-12px_rgba(79,70,229,0.6)] transition-all duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+  "inline-flex h-9 items-center gap-2 rounded-xl bg-accent px-3.5 text-[12.5px] font-medium text-white shadow-[0_1px_2px_rgba(79,70,229,0.28),0_8px_20px_-12px_rgba(79,70,229,0.6)] transition-all duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -325,14 +325,14 @@ function EmptySteps() {
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/15 bg-accent-soft text-accent">
               <EmptyStepIcon step={entry.step} />
             </span>
-            <span className="font-mono text-[9px] font-semibold tracking-[0.14em] text-muted/60">
+            <span className="font-mono text-[10.5px] font-semibold tracking-[0.14em] text-muted/60">
               0{entry.step}
             </span>
           </div>
-          <h3 className="mt-3 text-[12px] font-semibold text-forest">
+          <h3 className="mt-3 text-[13px] font-semibold text-forest">
             {entry.title}
           </h3>
-          <p className="mt-1.5 text-[10.5px] leading-5 text-muted">
+          <p className="mt-1.5 text-[12px] leading-5 text-muted">
             {entry.copy}
           </p>
         </div>
@@ -367,7 +367,7 @@ function StatusLegend() {
             <dt className="shrink-0">
               <StatusBadge status={status} />
             </dt>
-            <dd className="text-[10.5px] leading-4 text-muted">
+            <dd className="text-[12px] leading-4 text-muted">
               {STATUS_STYLES[status].description}
             </dd>
           </div>
@@ -393,7 +393,7 @@ function DocumentSection({
     >
       <div className="flex items-center gap-3">
         <span aria-hidden="true" className="h-px w-5 shrink-0 bg-accent/60" />
-        <h3 className="text-[10.5px] font-semibold uppercase leading-5 tracking-[0.2em] text-forest/75">
+        <h3 className="text-[12px] font-semibold uppercase leading-5 tracking-[0.2em] text-forest/75">
           {title}
         </h3>
       </div>
@@ -404,7 +404,7 @@ function DocumentSection({
 
 function EmptyNote() {
   return (
-    <p className="text-[12.5px] italic leading-6 text-muted/90">
+    <p className="text-[13.5px] italic leading-6 text-muted/90">
       None recorded in the source material.
     </p>
   );
@@ -457,11 +457,11 @@ function AnalysisProgress({
           <p
             role="status"
             aria-live="polite"
-            className="text-[11px] text-forest/80"
+            className="text-[12.5px] text-forest/80"
           >
             {messages[index]}
           </p>
-          <p className="mt-0.5 text-[10px] leading-4 text-muted">
+          <p className="mt-0.5 text-[11.5px] leading-4 text-muted">
             Previous results remain visible. This can take 60–90 seconds.
           </p>
         </div>
@@ -472,7 +472,7 @@ function AnalysisProgress({
   return (
     <div className="flex min-h-[460px] flex-col items-center justify-center rounded-xl border border-line bg-surface px-8 py-16 text-center lg:min-h-[560px]">
       <Spinner className="h-7 w-7 text-forest/60" />
-      <p className="mt-6 text-[9.5px] font-medium uppercase tracking-[0.24em] text-brass">
+      <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.24em] text-brass">
         {hasResults ? "Re-analyzing source" : "Running analysis"}
       </p>
       <p
@@ -482,7 +482,7 @@ function AnalysisProgress({
       >
         {messages[index]}
       </p>
-      <p className="mt-2 max-w-sm text-[12.5px] leading-6 text-muted">
+      <p className="mt-2 max-w-sm text-[13.5px] leading-6 text-muted">
         Analysis can take 60–90 seconds because Scope Guard runs generation, a
         separate review, and consistency validation.
       </p>
@@ -524,15 +524,15 @@ function ScopeItemList({
               <StatusBadge status={item.status} />
             </div>
             <div className="max-w-[68ch]">
-              <p className="text-[13.5px] leading-6 text-ink/85">{item.text}</p>
+              <p className="text-[14.5px] leading-6 text-ink/85">{item.text}</p>
               {item.rationale && item.status !== "confirmed" ? (
-                <p className="mt-1 text-[11.5px] leading-5 text-muted">
+                <p className="mt-1 text-[13px] leading-5 text-muted">
                   <span className="font-medium text-forest/70">Rationale:</span>{" "}
                   {item.rationale}
                 </p>
               ) : null}
               {clarification ? (
-                <p className="mt-1 text-[10.5px] leading-5 text-muted">
+                <p className="mt-1 text-[12px] leading-5 text-muted">
                   {clarification.confirmed
                     ? "From a client-confirmed clarification"
                     : "From an unconfirmed note"}
@@ -545,7 +545,7 @@ function ScopeItemList({
                   <button
                     type="button"
                     onClick={() => onResolveQuestion(item.text)}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-[3px] border border-line bg-surface px-2 py-1 text-[10px] font-medium uppercase tracking-[0.1em] text-forest transition-colors hover:border-forest/30 hover:bg-sage/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-[3px] border border-line bg-surface px-2 py-1 text-[11.5px] font-medium uppercase tracking-[0.1em] text-forest transition-colors hover:border-forest/30 hover:bg-sage/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   >
                     Resolve question
                     <AnalyzeArrow />
@@ -589,10 +589,10 @@ function ScopeItemEditor({
               onChange={(event) => onChange(index, event.target.value)}
               rows={2}
               aria-label={`${label} item ${index + 1}`}
-              className="block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[13px] leading-6 text-ink/90 outline-none transition-colors focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
+              className="block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[14px] leading-6 text-ink/90 outline-none transition-colors focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
             />
             {item.rationale && item.status !== "confirmed" ? (
-              <p className="mt-1 text-[11.5px] leading-5 text-muted">
+              <p className="mt-1 text-[13px] leading-5 text-muted">
                 <span className="font-medium text-forest/70">Rationale:</span>{" "}
                 {item.rationale}
               </p>
@@ -651,16 +651,16 @@ function ResolveQuestionForm({
       }}
       className="rounded-lg border border-line bg-canvas/60 p-4"
     >
-      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brass">
+      <p className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-brass">
         Resolve question
       </p>
-      <p className="mt-1.5 text-[12.5px] font-medium leading-5 text-ink">
+      <p className="mt-1.5 text-[13.5px] font-medium leading-5 text-ink">
         {question}
       </p>
 
       <label
         htmlFor="clarification-answer"
-        className="mt-3 block text-[10px] font-medium uppercase tracking-[0.14em] text-forest/70"
+        className="mt-3 block text-[11.5px] font-medium uppercase tracking-[0.14em] text-forest/70"
       >
         Client answer
       </label>
@@ -670,7 +670,7 @@ function ResolveQuestionForm({
         onChange={(event) => setAnswer(event.target.value)}
         rows={3}
         placeholder="Record the answer the client actually gave…"
-        className="mt-1.5 block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[12.5px] leading-5 text-ink/90 outline-none transition-colors placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
+        className="mt-1.5 block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[13.5px] leading-5 text-ink/90 outline-none transition-colors placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
       />
 
       <label className="mt-3 flex items-start gap-2.5">
@@ -680,7 +680,7 @@ function ResolveQuestionForm({
           onChange={(event) => setConfirmed(event.target.checked)}
           className="mt-0.5 h-4 w-4 shrink-0 accent-[#4f46e5]"
         />
-        <span className="text-[11px] leading-5 text-muted">
+        <span className="text-[12.5px] leading-5 text-muted">
           <span className="font-medium text-ink">
             The client confirmed this answer.
           </span>{" "}
@@ -692,7 +692,7 @@ function ResolveQuestionForm({
 
       {isEdited ? (
         <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
-          <p className="text-[11px] leading-5 text-amber-800">
+          <p className="text-[12.5px] leading-5 text-amber-800">
             This document has manual edits. Regenerating the scope will replace
             them.
           </p>
@@ -703,7 +703,7 @@ function ResolveQuestionForm({
               onChange={(event) => setAcknowledgeEdits(event.target.checked)}
               className="mt-0.5 h-4 w-4 shrink-0 accent-[#4f46e5]"
             />
-            <span className="text-[11px] leading-5 text-amber-800">
+            <span className="text-[12.5px] leading-5 text-amber-800">
               I understand these edits will be replaced.
             </span>
           </label>
@@ -711,14 +711,14 @@ function ResolveQuestionForm({
       ) : null}
 
       {sourceChanged ? (
-        <p className="mt-2 text-[10.5px] leading-5 text-muted">
+        <p className="mt-2 text-[12px] leading-5 text-muted">
           Resolution uses the transcript from the last analysis. Re-analyze if
           you changed the source.
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 whitespace-pre-line text-[11px] leading-5 text-rose-800">
+        <p role="alert" className="mt-3 whitespace-pre-line text-[12.5px] leading-5 text-rose-800">
           {error}
         </p>
       ) : null}
@@ -727,7 +727,7 @@ function ResolveQuestionForm({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3.5 text-[11px] font-medium text-white transition-colors hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:bg-accent/45"
+          className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3.5 text-[12.5px] font-medium text-white transition-colors hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:bg-accent/45"
         >
           {pending ? (
             <>
@@ -742,7 +742,7 @@ function ResolveQuestionForm({
           type="button"
           onClick={onCancel}
           disabled={pending}
-          className="inline-flex h-9 items-center rounded-md border border-line bg-surface px-3.5 text-[11px] font-medium text-forest transition-colors hover:border-forest/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 items-center rounded-md border border-line bg-surface px-3.5 text-[12.5px] font-medium text-forest transition-colors hover:border-forest/30 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Cancel
         </button>
@@ -768,12 +768,12 @@ function ClarificationList({
           }`}
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <p className="max-w-[60ch] text-[12.5px] font-medium leading-5 text-ink">
+            <p className="max-w-[60ch] text-[13.5px] font-medium leading-5 text-ink">
               {clarification.question}
             </p>
             <ClarificationStateBadge confirmed={clarification.confirmed} />
           </div>
-          <p className="mt-2 max-w-[68ch] text-[12px] leading-5 text-muted">
+          <p className="mt-2 max-w-[68ch] text-[13px] leading-5 text-muted">
             <span className="font-medium text-forest/70">Answer:</span>{" "}
             {clarification.answer}
           </p>
@@ -800,18 +800,18 @@ function ComparisonFindingRow({
     <li className="rounded-md border border-line bg-surface px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={`inline-flex items-center rounded-[3px] border px-1.5 py-0.5 text-[8.5px] font-semibold uppercase leading-none tracking-[0.1em] ${style.badge}`}
+          className={`inline-flex items-center rounded-[3px] border px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-[0.1em] ${style.badge}`}
         >
           {style.label}
         </span>
-        <span className="text-[9px] uppercase tracking-[0.14em] text-muted">
+        <span className="text-[10.5px] uppercase tracking-[0.14em] text-muted">
           {label}
         </span>
       </div>
-      <p className="mt-2 text-[12px] leading-5 text-ink/85">
+      <p className="mt-2 text-[13px] leading-5 text-ink/85">
         {finding.description}
       </p>
-      <p className="mt-1 text-[10.5px] italic leading-5 text-muted/80">
+      <p className="mt-1 text-[12px] italic leading-5 text-muted/80">
         &ldquo;{finding.sourceSnippet}&rdquo;
       </p>
     </li>
@@ -834,7 +834,7 @@ function ComparisonItemRow({ change }: { change: ItemChange }) {
 
   return (
     <li className="rounded-md border border-line bg-surface px-3.5 py-3">
-      <div className="flex flex-wrap items-center gap-2 text-[9px] uppercase tracking-[0.14em]">
+      <div className="flex flex-wrap items-center gap-2 text-[10.5px] uppercase tracking-[0.14em]">
         <span className="text-muted">
           {section}
           {destination && destination !== section ? ` → ${destination}` : ""}
@@ -868,24 +868,24 @@ function ComparisonItemRow({ change }: { change: ItemChange }) {
         <div className="mt-2 space-y-2">
           {change.textChanged ? (
             <>
-              <p className="text-[11.5px] leading-5 text-muted">
+              <p className="text-[13px] leading-5 text-muted">
                 <span className="font-medium">Before:</span>{" "}
                 {change.beforeText}
               </p>
-              <p className="text-[12.5px] leading-5 text-ink/85">
+              <p className="text-[13.5px] leading-5 text-ink/85">
                 <span className="font-medium text-forest/80">After:</span>{" "}
                 {change.afterText}
               </p>
             </>
           ) : (
-            <p className="text-[11.5px] leading-5 text-muted">
+            <p className="text-[13px] leading-5 text-muted">
               {change.statusChanged
                 ? "Commitment status updated."
                 : "Source attribution changed."}
             </p>
           )}
           {change.afterRationale ? (
-            <p className="text-[10.5px] leading-5 text-muted">
+            <p className="text-[12px] leading-5 text-muted">
               <span className="font-medium text-forest/70">Rationale:</span>{" "}
               {change.afterRationale}
             </p>
@@ -893,7 +893,7 @@ function ComparisonItemRow({ change }: { change: ItemChange }) {
         </div>
       ) : (
         <div className="mt-2">
-          <p className="text-[12.5px] leading-5 text-ink/85">
+          <p className="text-[13.5px] leading-5 text-ink/85">
             {change.kind === "removed"
               ? change.beforeText
               : (change.afterText ?? change.beforeText)}
@@ -937,7 +937,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-brass">
+          <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-brass">
             Clarification applied
           </p>
           <h2
@@ -951,20 +951,20 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
       </div>
 
       <div className="mt-4 rounded-lg border border-line bg-surface px-4 py-3">
-        <p className="text-[9px] uppercase tracking-[0.18em] text-muted">
+        <p className="text-[10.5px] uppercase tracking-[0.18em] text-muted">
           Question
         </p>
-        <p className="mt-1 text-[12.5px] font-medium leading-5 text-ink">
+        <p className="mt-1 text-[13.5px] font-medium leading-5 text-ink">
           {comparison.clarification.question}
         </p>
-        <p className="mt-3 text-[9px] uppercase tracking-[0.18em] text-muted">
+        <p className="mt-3 text-[10.5px] uppercase tracking-[0.18em] text-muted">
           Recorded answer
         </p>
-        <p className="mt-1 text-[12.5px] leading-5 text-ink/85">
+        <p className="mt-1 text-[13.5px] leading-5 text-ink/85">
           {comparison.clarification.answer}
         </p>
         <p
-          className={`mt-2 text-[11px] leading-5 ${
+          className={`mt-2 text-[12.5px] leading-5 ${
             comparison.questionResolved ? "text-forest" : "text-amber-800"
           }`}
         >
@@ -978,7 +978,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
         {comparison.summary.map((line) => (
           <li
             key={line}
-            className="flex gap-2 text-[11px] leading-5 text-muted"
+            className="flex gap-2 text-[12.5px] leading-5 text-muted"
           >
             <span
               aria-hidden="true"
@@ -990,11 +990,11 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
       </ul>
 
       <div className="mt-5">
-        <h3 className="text-[9.5px] font-semibold uppercase tracking-[0.18em] text-forest/70">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest/70">
           Scope changes
         </h3>
         {items.length === 0 ? (
-          <p className="mt-2 text-[11.5px] leading-5 text-muted">
+          <p className="mt-2 text-[13px] leading-5 text-muted">
             No scope items changed.
           </p>
         ) : (
@@ -1010,18 +1010,18 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
       </div>
 
       <div className="mt-5">
-        <h3 className="text-[9.5px] font-semibold uppercase tracking-[0.18em] text-forest/70">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest/70">
           Findings
         </h3>
         {!hasFindings ? (
-          <p className="mt-2 text-[11.5px] leading-5 text-muted">
+          <p className="mt-2 text-[13px] leading-5 text-muted">
             No findings were available for comparison.
           </p>
         ) : (
           <div className="mt-2 space-y-3">
             {findings.resolved.length > 0 ? (
               <div>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-forest/70">
+                <p className="text-[10.5px] uppercase tracking-[0.16em] text-forest/70">
                   Resolved
                 </p>
                 <ul className="mt-1.5 space-y-2">
@@ -1038,7 +1038,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
 
             {findings.remaining.length > 0 ? (
               <div>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-forest/70">
+                <p className="text-[10.5px] uppercase tracking-[0.16em] text-forest/70">
                   Retained
                 </p>
                 <ul className="mt-1.5 space-y-2">
@@ -1055,7 +1055,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
 
             {findings.changed.length > 0 ? (
               <div>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-forest/70">
+                <p className="text-[10.5px] uppercase tracking-[0.16em] text-forest/70">
                   Reworded
                 </p>
                 <ul className="mt-1.5 space-y-2">
@@ -1064,16 +1064,16 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
                       key={`changed-${index}`}
                       className="rounded-md border border-line bg-surface px-3.5 py-3"
                     >
-                      <p className="text-[9px] uppercase tracking-[0.14em] text-muted">
+                      <p className="text-[10.5px] uppercase tracking-[0.14em] text-muted">
                         Before
                       </p>
-                      <p className="mt-1 text-[11.5px] leading-5 text-muted">
+                      <p className="mt-1 text-[13px] leading-5 text-muted">
                         {change.before.description}
                       </p>
-                      <p className="mt-2 text-[9px] uppercase tracking-[0.14em] text-forest/70">
+                      <p className="mt-2 text-[10.5px] uppercase tracking-[0.14em] text-forest/70">
                         After
                       </p>
-                      <p className="mt-1 text-[12px] leading-5 text-ink/85">
+                      <p className="mt-1 text-[13px] leading-5 text-ink/85">
                         {change.after.description}
                       </p>
                     </li>
@@ -1084,7 +1084,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
 
             {findings.added.length > 0 ? (
               <div>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-amber-800">
+                <p className="text-[10.5px] uppercase tracking-[0.16em] text-amber-800">
                   New
                 </p>
                 <ul className="mt-1.5 space-y-2">
@@ -1101,7 +1101,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
 
             {findings.unmatched.length > 0 ? (
               <div>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-muted">
+                <p className="text-[10.5px] uppercase tracking-[0.16em] text-muted">
                   Not re-reported
                 </p>
                 <ul className="mt-1.5 space-y-2">
@@ -1149,32 +1149,32 @@ function FindingCard({
     >
       <div className="flex items-start justify-between gap-4">
         <span
-          className={`inline-flex items-center rounded-[3px] border px-2 py-1 text-[9.5px] font-semibold uppercase leading-none tracking-[0.12em] ${badge}`}
+          className={`inline-flex items-center rounded-[3px] border px-2 py-1 text-[11px] font-semibold uppercase leading-none tracking-[0.12em] ${badge}`}
         >
           {label}
         </span>
-        <span className="font-mono text-[9.5px] tabular-nums tracking-[0.1em] text-muted/60">
+        <span className="font-mono text-[11px] tabular-nums tracking-[0.1em] text-muted/60">
           {String(index + 1).padStart(2, "0")}
         </span>
       </div>
 
-      <p className="mt-3.5 text-[14.5px] font-medium leading-6 text-ink">
+      <p className="mt-3.5 text-[15.5px] font-medium leading-6 text-ink">
         {finding.description}
       </p>
 
       <div className="mt-3">
-        <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted">
           Why it matters
         </p>
-        <p className="mt-1 text-[12.5px] leading-6 text-muted">
+        <p className="mt-1 text-[13.5px] leading-6 text-muted">
           {finding.whyItMatters}
         </p>
       </div>
 
       {snippet ? (
-        <blockquote className="mt-3.5 whitespace-pre-line border-l-2 border-accent/40 bg-accent-soft/60 px-3.5 py-2.5 text-[12px] italic leading-6 text-forest/80">
+        <blockquote className="mt-3.5 whitespace-pre-line border-l-2 border-accent/40 bg-accent-soft/60 px-3.5 py-2.5 text-[13px] italic leading-6 text-forest/80">
           {finding.sourceKind === "clarification" ? (
-            <span className="mb-1 block text-[9px] font-medium uppercase not-italic tracking-[0.14em] text-muted">
+            <span className="mb-1 block text-[10.5px] font-medium uppercase not-italic tracking-[0.14em] text-muted">
               {clarification?.confirmed === false
                 ? "Source: unconfirmed clarification"
                 : "Source: client clarification"}
@@ -1610,7 +1610,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             aria-describedby="pdf-pending-questions-description"
             className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-2xl"
           >
-            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-amber-700">
               PDF preflight
             </p>
             <h2
@@ -1621,7 +1621,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             </h2>
             <p
               id="pdf-pending-questions-description"
-              className="mt-3 text-[13px] leading-6 text-muted"
+              className="mt-3 text-[14px] leading-6 text-muted"
             >
               Review them for a more complete scope, or download the current
               draft with unresolved items clearly identified.
@@ -1695,7 +1695,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
       <aside aria-labelledby="brief-heading" className="min-w-0 xl:sticky xl:top-24 xl:self-start">
         <div className="overflow-hidden rounded-2xl border border-line/70 bg-white/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_24px_48px_-32px_rgba(15,23,42,0.3)] backdrop-blur-xl">
           <div className="border-b border-line/80 px-5 py-5 sm:px-6">
-            <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-brass">
+            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-brass">
               01 / Source material
             </p>
             <h2
@@ -1731,7 +1731,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
           ) : (
             <div className="flex min-h-[460px] flex-col justify-center rounded-xl border border-line bg-surface px-5 py-10 text-center sm:px-8 lg:min-h-[560px]">
               <div className="mx-auto max-w-xl">
-                <p className="text-[9.5px] font-medium uppercase tracking-[0.24em] text-brass">
+                <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-brass">
                   Your analysis will appear here
                 </p>
                 <p className="mt-3 font-serif text-[24px] leading-tight text-forest sm:text-[27px]">
@@ -1754,7 +1754,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               <header className="border-b border-line/60 px-5 py-6 sm:px-7 lg:px-9">
                 <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                  <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-brass">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-brass">
                     Scope document
                   </p>
                   <h2
@@ -1763,12 +1763,12 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   >
                     Project Scope
                   </h2>
-                  <p className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted">
+                  <p className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] font-medium uppercase tracking-[0.18em] text-muted">
                     <span>Structured requirements brief</span>
                     <span aria-hidden="true" className="h-3 w-px bg-line" />
                     <span>Source: pasted brief</span>
                     {isEdited ? (
-                      <span className="rounded-[3px] border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[8.5px] tracking-[0.1em] text-amber-800">
+                      <span className="rounded-[3px] border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] tracking-[0.1em] text-amber-800">
                         Edited
                       </span>
                     ) : null}
@@ -1811,7 +1811,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   <p
                     role={exportStatus === "error" ? "alert" : "status"}
                     aria-live="polite"
-                    className={`min-h-4 text-[10px] ${
+                    className={`min-h-4 text-[11.5px] ${
                       exportStatus === "error"
                         ? "text-rose-800"
                         : "text-muted"
@@ -1840,7 +1840,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     ).map((status) => (
                       <li
                         key={status}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-line/80 bg-white/70 px-2.5 py-1 text-[10.5px] font-medium text-muted"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line/80 bg-white/70 px-2.5 py-1 text-[12px] font-medium text-muted"
                       >
                         <span
                           aria-hidden="true"
@@ -1852,7 +1852,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                         <span>{STATUS_STYLES[status].label.toLowerCase()}</span>
                       </li>
                     ))}
-                    <li className="inline-flex items-center gap-1.5 rounded-full border border-line/80 bg-white/70 px-2.5 py-1 text-[10.5px] font-medium text-muted">
+                    <li className="inline-flex items-center gap-1.5 rounded-full border border-line/80 bg-white/70 px-2.5 py-1 text-[12px] font-medium text-muted">
                       <span className="font-mono tabular-nums text-ink">
                         {findings?.length ?? 0}
                       </span>
@@ -1874,10 +1874,10 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                       }
                       rows={4}
                       aria-label="Problem statement"
-                      className="block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[13.5px] leading-6 text-ink/90 outline-none transition-colors focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
+                      className="block w-full resize-y rounded-md border border-line bg-white px-3 py-2 text-[14.5px] leading-6 text-ink/90 outline-none transition-colors focus:border-accent/70 focus:ring-4 focus:ring-accent-soft"
                     />
                   ) : (
-                    <p className="max-w-[68ch] text-[14.5px] leading-7 text-ink/85">
+                    <p className="max-w-[68ch] text-[15.5px] leading-7 text-ink/85">
                       {editedScope.problemStatement}
                     </p>
                   )}
@@ -2020,7 +2020,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             >
               <div className="flex flex-wrap items-end justify-between gap-4 px-1">
                 <div>
-                  <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-brass">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-brass">
                     02 / Independent review
                   </p>
                   <h2
@@ -2029,17 +2029,17 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   >
                     Scope Guard Review
                   </h2>
-                  <p className="mt-1.5 text-[12.5px] leading-5 text-muted">
+                  <p className="mt-1.5 text-[13.5px] leading-5 text-muted">
                     Potential issues to resolve before committing to scope.
                   </p>
                   {isEdited ? (
-                    <p className="mt-2 text-[11px] leading-5 text-amber-800">
+                    <p className="mt-2 text-[12.5px] leading-5 text-amber-800">
                       Document edited after analysis — findings refer to the
                       analyzed version.
                     </p>
                   ) : null}
                 </div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-forest/60">
+                <p className="text-[11.5px] font-medium uppercase tracking-[0.18em] text-forest/60">
                   <span className="font-mono tabular-nums">
                     {findings.length}
                   </span>{" "}
@@ -2050,7 +2050,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               <div className="mt-5 space-y-3">
                 {findings.length === 0 ? (
                   <div className="rounded-lg border border-line bg-surface px-5 py-8 text-center">
-                    <p className="text-[13px] leading-6 text-muted">
+                    <p className="text-[14px] leading-6 text-muted">
                       No verifiable findings were returned by this review.
                     </p>
                   </div>
@@ -2075,7 +2075,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               >
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <p className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-accent">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-accent">
                       03 / Client clarifications
                     </p>
                     <h2
@@ -2084,12 +2084,12 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     >
                       Recorded clarifications
                     </h2>
-                    <p className="mt-1.5 max-w-[60ch] text-[12.5px] leading-5 text-muted">
+                    <p className="mt-1.5 max-w-[60ch] text-[13.5px] leading-5 text-muted">
                       Client answers captured during review, kept separate from
                       the original transcript.
                     </p>
                   </div>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted">
+                  <p className="text-[11.5px] font-medium uppercase tracking-[0.18em] text-muted">
                     <span className="font-mono tabular-nums">
                       {editedScope.clarifications.length}
                     </span>{" "}

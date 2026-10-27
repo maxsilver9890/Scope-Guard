@@ -375,7 +375,7 @@ export function ScopeInput({
             aria-label={item.label}
             disabled={isRecording || isTranscribing}
             onClick={() => selectMode(item.id)}
-            className={`min-h-9 rounded-lg px-1.5 py-2 text-[10px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 sm:px-2 ${mode === item.id ? "bg-white text-forest shadow-sm" : "text-muted hover:bg-white/70 hover:text-forest"}`}
+            className={`min-h-9 rounded-lg px-1.5 py-2 text-[11.5px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60 sm:px-2 ${mode === item.id ? "bg-white text-forest shadow-sm" : "text-muted hover:bg-white/70 hover:text-forest"}`}
           >
             <span className="sm:hidden">{item.shortLabel}</span>
             <span className="hidden sm:inline">{item.label}</span>
@@ -383,31 +383,31 @@ export function ScopeInput({
         ))}
       </div>
 
-      <p className="mt-3 text-[11px] leading-5 text-muted" aria-live="polite">
+      <p className="mt-3 text-[12.5px] leading-5 text-muted" aria-live="polite">
         {MODE_DESCRIPTIONS[mode]}
       </p>
 
       {mode === "record" ? (
         <section className="mt-4 rounded-xl border border-line/70 bg-white/75 p-4" aria-labelledby="record-title">
-          <h3 id="record-title" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-forest">Record a conversation</h3>
-          <p className="mt-1.5 text-[11px] leading-5 text-muted">Recording stays in this browser until you choose transcription. Maximum 15 minutes and 4 MiB.</p>
-          <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[10.5px] leading-5 text-amber-900">Before recording, make sure everyone in the conversation knows it is being recorded and agrees.</p>
+          <h3 id="record-title" className="text-[12.5px] font-semibold uppercase tracking-[0.12em] text-forest">Record a conversation</h3>
+          <p className="mt-1.5 text-[12.5px] leading-5 text-muted">Recording stays in this browser until you choose transcription. Maximum 15 minutes and 4 MiB.</p>
+          <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-900">Before recording, make sure everyone in the conversation knows it is being recorded and agrees.</p>
           {unsupportedRecordingBrowser ? (
-            <p className="mt-3 text-[11px] leading-5 text-muted">Microphone recording needs a supported browser on HTTPS. Upload a recording or paste text instead.</p>
+            <p className="mt-3 text-[12.5px] leading-5 text-muted">Microphone recording needs a supported browser on HTTPS. Upload a recording or paste text instead.</p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
             {isRecording ? (
               <>
-                <span className="inline-flex items-center gap-2 text-[11px] font-medium text-rose-700" role="status"><span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />Recording · {formatDuration(elapsedSeconds)}</span>
-                <button type="button" onClick={() => stopRecording("transcribe")} className="rounded-lg bg-accent px-3 py-2 text-[11px] font-semibold text-white hover:bg-accent-strong">Stop & transcribe</button>
-                <button type="button" onClick={() => stopRecording("cancel")} className="rounded-lg border border-line px-3 py-2 text-[11px] font-medium text-forest hover:bg-slate-50">Cancel</button>
+                <span className="inline-flex items-center gap-2 text-[12.5px] font-medium text-rose-700" role="status"><span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />Recording · {formatDuration(elapsedSeconds)}</span>
+                <button type="button" onClick={() => stopRecording("transcribe")} className="rounded-lg bg-accent px-3 py-2 text-[12.5px] font-semibold text-white hover:bg-accent-strong">Stop & transcribe</button>
+                <button type="button" onClick={() => stopRecording("cancel")} className="rounded-lg border border-line px-3 py-2 text-[12.5px] font-medium text-forest hover:bg-slate-50">Cancel</button>
               </>
             ) : (
-              <button type="button" disabled={unsupportedRecordingBrowser || isTranscribing || isAnalyzing || isResolving} onClick={() => void startRecording()} className="rounded-lg bg-accent px-3.5 py-2.5 text-[11px] font-semibold text-white hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50">Start recording</button>
+              <button type="button" disabled={unsupportedRecordingBrowser || isTranscribing || isAnalyzing || isResolving} onClick={() => void startRecording()} className="rounded-lg bg-accent px-3.5 py-2.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50">Start recording</button>
             )}
           </div>
           {recordingFile ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-[10.5px] text-muted">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-muted">
               <span>{recordingFile.name} · {(recordingFile.size / (1024 * 1024)).toFixed(2)} MiB</span>
               {recordingFile.size <= MAX_AUDIO_BYTES ? <button type="button" disabled={isTranscribing} onClick={() => void transcribe(recordingFile)} className="font-semibold text-accent underline disabled:opacity-50">Retry transcription</button> : null}
               <button type="button" onClick={() => {
@@ -425,17 +425,17 @@ export function ScopeInput({
 
       {mode === "upload" ? (
         <section className="mt-4 rounded-xl border border-line/70 bg-white/75 p-4" aria-labelledby="upload-title">
-          <h3 id="upload-title" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-forest">Upload a recording</h3>
-          <p className="mt-1.5 text-[11px] leading-5 text-muted">MP3, M4A/MP4, WAV, WebM, OGG, FLAC, or AAC · up to 4 MiB.</p>
-          <input type="file" accept=".aac,.flac,.m4a,.mp3,.mp4,.oga,.ogg,.wav,.webm,audio/aac,audio/flac,audio/mp4,audio/mpeg,audio/ogg,audio/wav,audio/webm" onChange={handleFileChange} disabled={isTranscribing || isAnalyzing || isResolving} aria-label="Choose an audio recording" className="mt-3 block w-full text-[11px] text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-[11px] file:font-semibold file:text-forest hover:file:bg-slate-200" />
-          {selectedFile ? <p className="mt-2 break-all text-[10.5px] text-muted">Selected: {selectedFile.name} · {(selectedFile.size / (1024 * 1024)).toFixed(2)} MiB</p> : null}
-          <button type="button" disabled={!selectedFile || selectedFile.size > MAX_AUDIO_BYTES || isTranscribing || isAnalyzing || isResolving} onClick={() => selectedFile && void transcribe(selectedFile)} className="mt-3 rounded-lg border border-line px-3 py-2 text-[11px] font-semibold text-forest hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Transcribe recording</button>
+          <h3 id="upload-title" className="text-[12.5px] font-semibold uppercase tracking-[0.12em] text-forest">Upload a recording</h3>
+          <p className="mt-1.5 text-[12.5px] leading-5 text-muted">MP3, M4A/MP4, WAV, WebM, OGG, FLAC, or AAC · up to 4 MiB.</p>
+          <input type="file" accept=".aac,.flac,.m4a,.mp3,.mp4,.oga,.ogg,.wav,.webm,audio/aac,audio/flac,audio/mp4,audio/mpeg,audio/ogg,audio/wav,audio/webm" onChange={handleFileChange} disabled={isTranscribing || isAnalyzing || isResolving} aria-label="Choose an audio recording" className="mt-3 block w-full text-[12.5px] text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-[12.5px] file:font-semibold file:text-forest hover:file:bg-slate-200" />
+          {selectedFile ? <p className="mt-2 break-all text-[12px] text-muted">Selected: {selectedFile.name} · {(selectedFile.size / (1024 * 1024)).toFixed(2)} MiB</p> : null}
+          <button type="button" disabled={!selectedFile || selectedFile.size > MAX_AUDIO_BYTES || isTranscribing || isAnalyzing || isResolving} onClick={() => selectedFile && void transcribe(selectedFile)} className="mt-3 rounded-lg border border-line px-3 py-2 text-[12.5px] font-semibold text-forest hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">Transcribe recording</button>
         </section>
       ) : null}
 
       <div className="mt-4 flex items-baseline justify-between gap-3">
-        <label htmlFor="source-input" className="text-[10px] font-medium uppercase tracking-[0.16em] text-forest/70">FINAL SOURCE MATERIAL / TRANSCRIPT</label>
-        <span className="font-mono text-[10px] tabular-nums text-muted/80">{input.length.toLocaleString("en-US")} characters</span>
+        <label htmlFor="source-input" className="text-[11.5px] font-medium uppercase tracking-[0.16em] text-forest/70">FINAL SOURCE MATERIAL / TRANSCRIPT</label>
+        <span className="font-mono text-[11.5px] tabular-nums text-muted/80">{input.length.toLocaleString("en-US")} characters</span>
       </div>
       <textarea
         id="source-input"
@@ -448,26 +448,26 @@ export function ScopeInput({
         spellCheck={false}
         placeholder={mode === "paste" ? "Paste a discovery transcript, meeting notes, or a rough project brief…" : "Transcribe a recording or add written context here…"}
         aria-describedby={`source-helper transcription-privacy${canAnalyze ? "" : " source-empty-message"}`}
-        className="mt-2.5 block max-h-[70vh] min-h-[300px] w-full resize-y rounded-md border border-line bg-white px-4 py-3.5 font-sans text-[13px] leading-[1.75] text-ink/90 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-colors duration-200 placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft sm:min-h-[380px]"
+        className="mt-2.5 block max-h-[70vh] min-h-[300px] w-full resize-y rounded-md border border-line bg-white px-4 py-3.5 font-sans text-[14px] leading-[1.75] text-ink/90 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-colors duration-200 placeholder:text-muted/60 focus:border-accent/70 focus:ring-4 focus:ring-accent-soft sm:min-h-[380px]"
       />
 
-      <p id="source-helper" className="mt-2.5 flex items-center gap-2 text-[11px] text-muted">
+      <p id="source-helper" className="mt-2.5 flex items-center gap-2 text-[12.5px] text-muted">
         <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} />
         <span>Source brief · {sourceStatus}</span>
       </p>
 
       {isTranscribing ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-3 text-[11px] text-sky-900" role="status" aria-live="polite">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-3 text-[12.5px] text-sky-900" role="status" aria-live="polite">
           <span className="inline-flex items-center gap-2"><Spinner />Transcribing recording…</span>
           <button type="button" onClick={() => requestRef.current?.abort()} className="font-semibold underline">Cancel transcription</button>
         </div>
       ) : null}
-      {transcriptionError ? <p role="alert" className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3.5 py-3 text-[11px] leading-5 text-rose-800">{transcriptionError}</p> : null}
-      {transcriptionNotice ? <p role="status" aria-live="polite" className="mt-3 rounded-md border border-line bg-surface px-3.5 py-3 text-[11px] leading-5 text-muted">{transcriptionNotice}</p> : null}
-      {transcriptionCancelled && lastTranscribedFile ? <button type="button" onClick={() => void transcribe(lastTranscribedFile)} className="mt-2 text-[10.5px] font-semibold text-accent underline">Retry transcription</button> : null}
-      {analysisError ? <div role="alert" className="mt-3.5 flex items-start gap-2.5 rounded-md border border-rose-200 bg-rose-50 px-3.5 py-3 text-[12px] leading-5 text-rose-800"><p>{analysisError}</p></div> : null}
+      {transcriptionError ? <p role="alert" className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3.5 py-3 text-[12.5px] leading-5 text-rose-800">{transcriptionError}</p> : null}
+      {transcriptionNotice ? <p role="status" aria-live="polite" className="mt-3 rounded-md border border-line bg-surface px-3.5 py-3 text-[12.5px] leading-5 text-muted">{transcriptionNotice}</p> : null}
+      {transcriptionCancelled && lastTranscribedFile ? <button type="button" onClick={() => void transcribe(lastTranscribedFile)} className="mt-2 text-[12px] font-semibold text-accent underline">Retry transcription</button> : null}
+      {analysisError ? <div role="alert" className="mt-3.5 flex items-start gap-2.5 rounded-md border border-rose-200 bg-rose-50 px-3.5 py-3 text-[13px] leading-5 text-rose-800"><p>{analysisError}</p></div> : null}
 
-      {mode !== "paste" ? <p id="transcription-privacy" className="mt-3 rounded-md bg-slate-50 px-3 py-2.5 text-[10px] leading-5 text-muted">When you transcribe, the audio is sent securely to Scope Guard’s server and forwarded to OpenRouter and its transcription provider. Audio is not stored by Scope Guard after the request. Provider retention may vary. Use recordings only with participants’ knowledge and consent.</p> : <span id="transcription-privacy" className="sr-only">Text is sent to Scope Guard for analysis only when Analyze is selected.</span>}
+      {mode !== "paste" ? <p id="transcription-privacy" className="mt-3 rounded-md bg-slate-50 px-3 py-2.5 text-[11.5px] leading-5 text-muted">When you transcribe, the audio is sent securely to Scope Guard’s server and forwarded to OpenRouter and its transcription provider. Audio is not stored by Scope Guard after the request. Provider retention may vary. Use recordings only with participants’ knowledge and consent.</p> : <span id="transcription-privacy" className="sr-only">Text is sent to Scope Guard for analysis only when Analyze is selected.</span>}
 
       {pendingTranscript !== null ? (
         <div
@@ -483,23 +483,23 @@ export function ScopeInput({
             aria-describedby="transcript-choice-description"
             className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-2xl"
           >
-            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-accent">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent">
               Transcription complete
             </p>
             <h2 id="transcript-choice-title" className="mt-2 font-serif text-2xl leading-tight text-forest">
               How should we use this transcript?
             </h2>
-            <p id="transcript-choice-description" className="mt-3 text-[13px] leading-6 text-muted">
+            <p id="transcript-choice-description" className="mt-3 text-[14px] leading-6 text-muted">
               Replacing discards the existing text in the source field. Appending combines the existing text and transcript for analysis.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={() => chooseTranscript("cancel")} className="inline-flex h-9 items-center rounded-md border border-line bg-surface px-3.5 text-[11px] font-medium text-forest transition-colors hover:border-forest/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+              <button type="button" onClick={() => chooseTranscript("cancel")} className="inline-flex h-9 items-center rounded-md border border-line bg-surface px-3.5 text-[12.5px] font-medium text-forest transition-colors hover:border-forest/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
                 Cancel
               </button>
-              <button type="button" onClick={() => chooseTranscript("append")} className="inline-flex h-9 items-center rounded-md border border-line bg-white px-3.5 text-[11px] font-medium text-forest transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+              <button type="button" onClick={() => chooseTranscript("append")} className="inline-flex h-9 items-center rounded-md border border-line bg-white px-3.5 text-[12.5px] font-medium text-forest transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
                 Append transcript
               </button>
-              <button type="button" onClick={() => chooseTranscript("replace")} className="inline-flex h-9 items-center rounded-md bg-accent px-3.5 text-[11px] font-medium text-white transition-colors hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+              <button type="button" onClick={() => chooseTranscript("replace")} className="inline-flex h-9 items-center rounded-md bg-accent px-3.5 text-[12.5px] font-medium text-white transition-colors hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
                 Replace existing text
               </button>
             </div>
@@ -508,7 +508,7 @@ export function ScopeInput({
       ) : null}
 
       {!canAnalyze ? (
-        <p id="source-empty-message" role="status" aria-live="polite" className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[11px] leading-5 text-amber-900">
+        <p id="source-empty-message" role="status" aria-live="polite" className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12.5px] leading-5 text-amber-900">
           Add source text before analyzing. You can paste text, or transcribe a recording into this field.
         </p>
       ) : null}
@@ -517,7 +517,7 @@ export function ScopeInput({
         type="submit"
         disabled={isAnalyzing || isResolving || isTranscribing || !canAnalyze}
         aria-busy={isAnalyzing}
-        className="group mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-accent px-5 text-[13px] font-medium tracking-[0.01em] text-white shadow-[0_1px_2px_rgba(79,70,229,0.3),0_10px_24px_-14px_rgba(79,70,229,0.7)] transition-colors duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-accent/45 disabled:text-white/80"
+        className="group mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-accent px-5 text-[14px] font-medium tracking-[0.01em] text-white shadow-[0_1px_2px_rgba(79,70,229,0.3),0_10px_24px_-14px_rgba(79,70,229,0.7)] transition-colors duration-200 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-accent/45 disabled:text-white/80"
       >
         {isAnalyzing ? (
           <><Spinner />{analyzeButtonLabel(isAnalyzing, hasAnalysis)}</>
@@ -525,7 +525,7 @@ export function ScopeInput({
           <>{analyzeButtonLabel(isAnalyzing, hasAnalysis)}<AnalyzeArrow /></>
         )}
       </button>
-      <p className="mt-3 text-center text-[10.5px] leading-5 text-muted/80">One extraction pass · One Scope Guard review</p>
+      <p className="mt-3 text-center text-[12px] leading-5 text-muted/80">One extraction pass · One Scope Guard review</p>
     </form>
   );
 }

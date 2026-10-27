@@ -300,10 +300,10 @@ export function ScopeNav({
               </svg>
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-[13px] font-semibold leading-tight text-forest">
+              <span className="block truncate text-[14px] font-semibold leading-tight text-forest">
                 Scope Guard
               </span>
-              <span className="block text-[9px] font-medium uppercase tracking-[0.18em] text-muted">
+              <span className="block text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted">
                 Document map
               </span>
             </span>
@@ -325,7 +325,7 @@ export function ScopeNav({
                     event.preventDefault();
                     onNavigate(item.id);
                   }}
-                  className={`relative flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
+                  className={`relative flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
                     active
                       ? "bg-accent-soft text-accent-strong"
                       : "text-muted hover:bg-sage hover:text-forest"

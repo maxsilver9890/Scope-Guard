@@ -52,7 +52,7 @@ const STRUCTURED_ITEMS: Array<{
 function StatusPill({ status }: { status: PipelineStatus }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[7.5px] font-bold uppercase tracking-[0.12em] ${STATUS_STYLES[status]}`}
+      className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.12em] ${STATUS_STYLES[status]}`}
     >
       {status}
     </span>
@@ -151,10 +151,10 @@ function AmbiguousNode() {
             key={fragment.title}
             className={`pipeline-fragment ${fragment.className}`}
           >
-            <p className="text-[9px] font-semibold leading-4 text-navy/85">
+            <p className="text-[10px] font-semibold leading-4 text-navy/85">
               {fragment.title}
             </p>
-            <p className="mt-0.5 text-[7.5px] leading-3.5 text-[#9a5635]">
+            <p className="mt-0.5 text-[8.5px] leading-3.5 text-[#9a5635]">
               {fragment.detail}
             </p>
           </div>
@@ -191,14 +191,14 @@ function AssumptionsNode() {
         <AssumptionRow>Analytics scope left undefined</AssumptionRow>
       </div>
       <div className="mt-3 rounded-xl border border-[#ecc5ad] bg-[#fff8f3] p-2.5">
-        <p className="text-[7.5px] font-bold uppercase tracking-[0.14em] text-[#9a5635]">
+        <p className="text-[8.5px] font-bold uppercase tracking-[0.14em] text-[#9a5635]">
           Decisions made by default
         </p>
         <div className="mt-1.5 flex flex-wrap gap-1">
           {["API exists", "Date fixed", "Scope enough"].map((tag) => (
             <span
               key={tag}
-              className="rounded-full border border-[#ecc5ad] bg-white/70 px-1.5 py-0.5 text-[6.5px] font-semibold uppercase tracking-[0.08em] text-[#8a4b2d]"
+              className="rounded-full border border-[#ecc5ad] bg-white/70 px-1.5 py-0.5 text-[7.5px] font-semibold uppercase tracking-[0.08em] text-[#8a4b2d]"
             >
               {tag}
             </span>
@@ -216,7 +216,7 @@ function BrokenStore() {
       aria-hidden="true"
     >
       <div className="flex items-center justify-between border-b border-navy/8 px-2 py-1.5">
-        <span className="text-[7px] font-bold uppercase tracking-[0.12em] text-navy/70">
+        <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-navy/70">
           UrbanNest
         </span>
         <span className="h-1.5 w-9 rounded-full bg-navy/10" />
@@ -233,7 +233,7 @@ function BrokenStore() {
               <div className="h-1 w-1/2 rounded-full bg-navy/8" />
             </div>
             {index === 1 ? (
-              <span className="absolute right-1 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-[#f8ddcf] text-[6px] font-bold text-[#9a5635]">
+              <span className="absolute right-1 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-[#f8ddcf] text-[7px] font-bold text-[#9a5635]">
                 !
               </span>
             ) : null}
@@ -241,10 +241,10 @@ function BrokenStore() {
         ))}
       </div>
       <div className="flex items-center justify-between gap-2 px-2 pb-2">
-        <span className="rounded bg-navy/8 px-2 py-1 text-[6px] uppercase tracking-[0.1em] text-navy/35">
+        <span className="rounded bg-navy/8 px-2 py-1 text-[7px] uppercase tracking-[0.1em] text-navy/35">
           Checkout
         </span>
-        <span className="text-[6px] text-[#9a5635]">Missing state</span>
+        <span className="text-[7px] text-[#9a5635]">Missing state</span>
       </div>
     </div>
   );
@@ -261,7 +261,7 @@ function OutcomeNode({ broken }: { broken: boolean }) {
           Product outcome
         </span>
         <span
-          className={`rounded-full px-2 py-0.5 text-[7px] font-bold uppercase tracking-[0.1em] ${
+          className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] ${
             broken
               ? "bg-[#f8ddcf] text-[#9a5635]"
               : "bg-mint text-emerald-700"
@@ -283,7 +283,7 @@ function PolishedStore() {
   return (
     <div className="mini-store mini-store--polished mt-3" aria-hidden="true">
       <div className="flex items-center justify-between border-b border-navy/8 px-2 py-1.5">
-        <span className="text-[7px] font-bold uppercase tracking-[0.12em] text-brand">
+        <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-brand">
           UrbanNest
         </span>
         <div className="flex items-center gap-1">
@@ -312,10 +312,10 @@ function PolishedStore() {
         ))}
       </div>
       <div className="flex items-center justify-between gap-2 px-2 pb-2">
-        <span className="rounded bg-brand px-2 py-1 text-[6px] font-semibold text-white">
+        <span className="rounded bg-brand px-2 py-1 text-[7px] font-semibold text-white">
           Checkout
         </span>
-        <span className="text-[6px] text-emerald-700">Ready</span>
+        <span className="text-[7px] text-emerald-700">Ready</span>
       </div>
     </div>
   );
@@ -331,10 +331,10 @@ function ScopeGuardNode() {
             <LandingIcon name="shield" className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-brand">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand">
               Scope Guard
             </p>
-            <p className="text-[6.5px] font-semibold uppercase tracking-[0.14em] text-brand/55">
+            <p className="text-[7.5px] font-semibold uppercase tracking-[0.14em] text-brand/55">
               Structure + verify
             </p>
           </div>
@@ -346,13 +346,13 @@ function ScopeGuardNode() {
           {["Source quotes", "Status-aware", "Open questions"].map((tag) => (
             <span
               key={tag}
-              className="rounded-full border border-brand/15 bg-white/75 px-1.5 py-0.5 text-[6.5px] font-semibold uppercase tracking-[0.08em] text-brand"
+              className="rounded-full border border-brand/15 bg-white/75 px-1.5 py-0.5 text-[7.5px] font-semibold uppercase tracking-[0.08em] text-brand"
             >
               {tag}
             </span>
           ))}
         </div>
-        <p className="mt-3 text-[7.5px] leading-3.5 text-slatebody">
+        <p className="mt-3 text-[8.5px] leading-3.5 text-slatebody">
           Ambiguity is preserved for review — not silently resolved.
         </p>
       </div>
@@ -378,12 +378,12 @@ function StructuredScopeNode() {
             style={{ animationDelay: `${8.9 + index * 0.22}s` }}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="text-[8.5px] font-semibold leading-3.5 text-navy">
+              <p className="text-[9.5px] font-semibold leading-3.5 text-navy">
                 {item.text}
               </p>
               <StatusPill status={item.status} />
             </div>
-            <p className="mt-1 flex items-start gap-1 text-[6.5px] leading-3 text-slatebody">
+            <p className="mt-1 flex items-start gap-1 text-[7.5px] leading-3 text-slatebody">
               <LandingIcon name="link" className="mt-0.5 h-2.5 w-2.5 shrink-0 text-brand" />
               {item.evidence}
             </p>
@@ -453,7 +453,7 @@ function PipelineResult({
         <h4 className="text-[13px] font-semibold tracking-[-0.01em] text-navy">
           {title}
         </h4>
-        <p className="mt-1 text-[10px] leading-5 text-slatebody">{copy}</p>
+        <p className="mt-1 text-[11px] leading-5 text-slatebody">{copy}</p>
       </div>
     </div>
   );
@@ -800,10 +800,10 @@ export function PipelineDemo() {
             <LandingIcon name="compare" className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand">
               Interactive comparison
             </p>
-            <p className="mt-0.5 text-[10.5px] text-slatebody">
+            <p className="mt-0.5 text-[11.5px] text-slatebody">
               A 16-second walkthrough. Replay it or skip to the result.
             </p>
           </div>
@@ -860,7 +860,7 @@ export function PipelineDemo() {
           <div className="pipeline-panel-head">
             <div className="flex items-center gap-2">
               <span className="pipeline-led pipeline-led--bad" />
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9a5635]">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#9a5635]">
                 Without Scope Guard
               </h3>
             </div>
@@ -898,7 +898,7 @@ export function PipelineDemo() {
           <div className="pipeline-panel-head">
             <div className="flex items-center gap-2">
               <span className="pipeline-led pipeline-led--good" />
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700">
                 With Scope Guard
               </h3>
             </div>

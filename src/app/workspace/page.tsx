@@ -81,7 +81,7 @@ export default async function Home() {
               <span className="whitespace-nowrap font-serif text-[20px] leading-none tracking-[-0.015em] text-text-on-dark">
                 Scope Guard
               </span>
-              <span className="hidden text-[9px] font-medium uppercase tracking-[0.24em] text-[#94a3b8] sm:inline">
+              <span className="hidden text-[10.5px] font-medium uppercase tracking-[0.24em] text-[#94a3b8] sm:inline">
                 Scoping intelligence
               </span>
             </div>
@@ -91,7 +91,7 @@ export default async function Home() {
               className="h-1.5 w-1.5 rounded-full bg-[#a5b4fc]"
               aria-hidden="true"
             />
-            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#cbd5e1]">
+            <span className="text-[11.5px] font-medium uppercase tracking-[0.14em] text-[#cbd5e1]">
               Analysis workspace
             </span>
           </div>
@@ -105,7 +105,7 @@ export default async function Home() {
               <div className="lg:col-span-8">
                 <div className="flex items-center gap-3">
                   <span className="h-px w-8 bg-[#a5b4fc]/70" aria-hidden="true" />
-                  <p className="text-[9.5px] font-medium uppercase tracking-[0.26em] text-[#a5b4fc]">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.26em] text-[#a5b4fc]">
                     From conversation to clarity
                   </p>
                 </div>
@@ -117,7 +117,7 @@ export default async function Home() {
                 </h1>
               </div>
               <div className="lg:col-span-4 lg:pb-1">
-                <p className="max-w-sm text-[13.5px] leading-6 text-[#94a3b8] lg:ml-auto">
+                <p className="max-w-sm text-[14.5px] leading-6 text-[#94a3b8] lg:ml-auto">
                   Turn client conversations into explicit scope, testable
                   requirements, and risks your team can act on.
                 </p>

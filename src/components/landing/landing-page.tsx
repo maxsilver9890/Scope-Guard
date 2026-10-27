@@ -1281,14 +1281,14 @@ function FeatureCard({
         <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/70 bg-white/70 text-brand">
           <LandingIcon name={icon} className="h-4 w-4" />
         </span>
-        <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-navy/45">
+        <span className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-navy/45">
           {eyebrow}
         </span>
       </div>
-      <h3 className="mt-4 text-[17px] font-semibold tracking-[-0.01em] text-navy">
+      <h3 className="mt-4 text-[18px] font-semibold tracking-[-0.01em] text-navy">
         {title}
       </h3>
-      <p className="mt-1.5 text-[11px] leading-5 text-slatebody">{description}</p>
+      <p className="mt-2 text-[13px] leading-6 text-slatebody">{description}</p>
       <div className="mt-auto pt-4">{visual}</div>
     </article>
   );
@@ -1457,10 +1457,10 @@ function TrustSection() {
                 >
                   <LandingIcon name={panel.icon} className="h-5 w-5" />
                 </span>
-                <h3 className="mt-4 text-[14px] font-semibold text-navy">
+                <h3 className="mt-4 text-[15.5px] font-semibold text-navy">
                   {panel.title}
                 </h3>
-                <p className="mt-1.5 text-[11px] leading-5 text-slatebody">
+                <p className="mt-2 text-[13px] leading-6 text-slatebody">
                   {panel.copy}
                 </p>
               </article>
@@ -1734,10 +1734,10 @@ function TechCard({ tech }: { tech: (typeof TECH)[number] }) {
         </span>
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
       </div>
-      <h3 className="mt-4 text-[15.5px] font-semibold tracking-[-0.01em] text-navy">
+      <h3 className="mt-4 text-[17px] font-semibold tracking-[-0.01em] text-navy">
         {tech.name}
       </h3>
-      <p className="mt-2 text-[12.5px] leading-[1.65] text-slatebody">
+      <p className="mt-2 text-[14px] leading-[1.7] text-slatebody">
         {tech.role}
       </p>
     </article>
@@ -1949,18 +1949,18 @@ function Footer() {
           <div>
             <div className="flex items-center gap-2.5">
               <BrandMark size={34} />
-              <span className="font-display text-[22px] tracking-[-0.02em] text-navy">
+              <span className="font-display text-[24px] tracking-[-0.02em] text-navy">
                 Scope Guard
               </span>
             </div>
-            <p className="mt-3.5 max-w-[36ch] text-[13.5px] leading-6 text-slatebody">
+            <p className="mt-3.5 max-w-[36ch] text-[15px] leading-7 text-slatebody">
               Evidence-backed project scoping. Turn discovery conversations
               into commitments you can inspect.
             </p>
           </div>
 
           <nav aria-label="Footer sections">
-            <p className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-navy/45">
+            <p className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-navy/45">
               Explore
             </p>
             <ul className="mt-4 grid gap-2.5">
@@ -1974,7 +1974,7 @@ function Footer() {
                 <li key={label}>
                   <a
                     href={href}
-                    className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    className="text-[14.5px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   >
                     {label}
                   </a>
@@ -1984,14 +1984,14 @@ function Footer() {
           </nav>
 
           <div>
-            <p className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-navy/45">
+            <p className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-navy/45">
               Project
             </p>
             <ul className="mt-4 grid gap-2.5">
               <li>
                 <a
                   href="#tech-stack"
-                  className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="text-[14.5px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   Tech Stack
                 </a>
@@ -2001,7 +2001,7 @@ function Footer() {
                   href={GITHUB_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="text-[14.5px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   GitHub Repository ↗
                 </a>
@@ -2009,7 +2009,7 @@ function Footer() {
               <li>
                 <Link
                   href="/workspace"
-                  className="text-[13px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="text-[14.5px] text-slatebody transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   Open the workspace
                 </Link>
@@ -2019,7 +2019,7 @@ function Footer() {
         </div>
 
         <div className="mt-12 border-t border-navy/8 pt-10 text-center sm:pt-12">
-          <span className="inline-flex items-center gap-2 rounded-full border border-brand/15 bg-white/65 px-3.5 py-1.5 text-[9.5px] font-bold uppercase tracking-[0.2em] text-brand">
+          <span className="inline-flex items-center gap-2 rounded-full border border-brand/15 bg-white/65 px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.2em] text-brand">
             <span
               aria-hidden="true"
               className="h-1.5 w-1.5 rounded-full bg-brand/75"
@@ -2030,13 +2030,13 @@ function Footer() {
             Made with <span className="text-brand">Alan AI</span> for the
             OpenFire Hackathon.
           </p>
-          <p className="mx-auto mt-4 max-w-[58ch] text-[13px] leading-7 text-slatebody">
+          <p className="mx-auto mt-4 max-w-[58ch] text-[14.5px] leading-7 text-slatebody">
             Conceived, built, tested, and shipped end-to-end with Alan&apos;s AI
             software factory.
           </p>
         </div>
 
-        <div className="mt-10 flex flex-col gap-2 border-t border-navy/8 pt-5 text-[11.5px] text-slatebody/80 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-10 flex flex-col gap-2 border-t border-navy/8 pt-5 text-[13px] text-slatebody/80 sm:flex-row sm:items-center sm:justify-between">
           <p>Scope Guard — evidence-backed project scoping.</p>
           <p>Human review stays in the loop.</p>
         </div>
