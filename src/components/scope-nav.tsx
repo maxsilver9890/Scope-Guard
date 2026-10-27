@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { BrandMark } from "@/components/landing/brand-mark";
+
 export type NavIconName =
   | "overview"
   | "in-scope"
@@ -288,19 +290,9 @@ export function ScopeNav({
       >
         {isRail ? (
           <div className="mb-2 flex items-center gap-2.5 rounded-2xl px-2 pb-2 pt-1.5">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-forest text-[#f7f6f3]">
-              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-4 w-4">
-                <path
-                  d="M5 14V6h8"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="square"
-                />
-                <circle cx="13.4" cy="6.4" r="1.6" fill="#8b93f8" />
-              </svg>
-            </span>
+            <BrandMark size={28} />
             <span className="min-w-0">
-              <span className="block truncate text-[14px] font-semibold leading-tight text-forest">
+              <span className="block truncate font-display text-[15px] font-semibold leading-tight text-forest">
                 Scope Guard
               </span>
               <span className="block text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted">

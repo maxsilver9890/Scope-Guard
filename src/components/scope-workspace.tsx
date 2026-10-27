@@ -478,7 +478,7 @@ function AnalysisProgress({
       <p
         role="status"
         aria-live="polite"
-        className="mt-3 font-serif text-[22px] text-forest"
+        className="mt-3 font-display text-[22px] text-forest"
       >
         {messages[index]}
       </p>
@@ -942,7 +942,7 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
           </p>
           <h2
             id="comparison-heading"
-            className="mt-2 font-serif text-[26px] leading-tight tracking-[-0.01em] text-forest"
+            className="mt-2 font-display text-[26px] leading-tight tracking-[-0.01em] text-forest"
           >
             What changed
           </h2>
@@ -1615,7 +1615,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             </p>
             <h2
               id="pdf-pending-questions-title"
-              className="mt-2 font-serif text-2xl leading-tight text-forest"
+              className="mt-2 font-display text-2xl leading-tight text-forest"
             >
               {pdfPreflightTitle(pdfPreflight.count)}
             </h2>
@@ -1700,7 +1700,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
             </p>
             <h2
               id="brief-heading"
-              className="mt-2.5 font-serif text-[26px] leading-tight tracking-[-0.01em] text-forest"
+              className="mt-2.5 font-display text-[26px] leading-tight tracking-[-0.01em] text-forest"
             >
               Project brief
             </h2>
@@ -1734,7 +1734,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                 <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-brass">
                   Your analysis will appear here
                 </p>
-                <p className="mt-3 font-serif text-[24px] leading-tight text-forest sm:text-[27px]">
+                <p className="mt-3 font-display text-[24px] leading-tight text-forest sm:text-[27px]">
                   From conversation to reviewable scope
                 </p>
               </div>
@@ -1759,7 +1759,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   </p>
                   <h2
                     id="scope-doc-heading"
-                    className="mt-2 font-serif text-[32px] leading-none tracking-[-0.018em] text-forest sm:text-[36px]"
+                    className="mt-2 font-display text-[32px] leading-none tracking-[-0.018em] text-forest sm:text-[36px]"
                   >
                     Project Scope
                   </h2>
@@ -2025,7 +2025,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                   </p>
                   <h2
                     id="findings-heading"
-                    className="mt-2 font-serif text-[26px] leading-tight tracking-[-0.01em] text-forest"
+                    className="mt-2 font-display text-[26px] leading-tight tracking-[-0.01em] text-forest"
                   >
                     Scope Guard Review
                   </h2>
@@ -2080,7 +2080,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
                     </p>
                     <h2
                       id="clarifications-heading"
-                      className="mt-2 font-serif text-[24px] leading-tight tracking-[-0.01em] text-forest"
+                      className="mt-2 font-display text-[24px] leading-tight tracking-[-0.01em] text-forest"
                     >
                       Recorded clarifications
                     </h2>

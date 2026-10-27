@@ -486,7 +486,7 @@ export function ScopeInput({
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent">
               Transcription complete
             </p>
-            <h2 id="transcript-choice-title" className="mt-2 font-serif text-2xl leading-tight text-forest">
+            <h2 id="transcript-choice-title" className="mt-2 font-display text-2xl leading-tight text-forest">
               How should we use this transcript?
             </h2>
             <p id="transcript-choice-description" className="mt-3 text-[14px] leading-6 text-muted">

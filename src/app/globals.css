@@ -1,40 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  --canvas: #f7f6f3;
+  --canvas: #fafaf7;
   --surface: #ffffff;
-  --forest: #1b2440;
+  --forest: #172033;
   --ink: #242c3d;
-  --muted: #667085;
-  --line: #e6e6ea;
-  --brass: #4f46e5;
-  --sage: #eef1fb;
+  --muted: #64748b;
+  --line: #e6e1ef;
+  --brass: #7057f5;
+  --sage: #f3efff;
 
-  --accent: #4f46e5;
-  --accent-strong: #4338ca;
-  --accent-soft: #eef1fb;
-  --accent-line: #d9dcef;
+  --accent: #7057f5;
+  --accent-strong: #5b45d9;
+  --accent-soft: #f1edff;
+  --accent-line: #ddd5f7;
 
-  --canvas-dark: #1b2440;
+  --canvas-dark: #172033;
   --text-on-dark: #f0eff8;
 }
 
 @theme inline {
-  --color-canvas: #f7f6f3;
+  --color-canvas: #fafaf7;
   --color-surface: #ffffff;
-  --color-forest: #1b2440;
+  --color-forest: #172033;
   --color-ink: #242c3d;
-  --color-muted: #667085;
-  --color-line: #e6e6ea;
-  --color-brass: #4f46e5;
-  --color-sage: #eef1fb;
+  --color-muted: #64748b;
+  --color-line: #e6e1ef;
+  --color-brass: #7057f5;
+  --color-sage: #f3efff;
 
-  --color-accent: #4f46e5;
-  --color-accent-strong: #4338ca;
-  --color-accent-soft: #eef1fb;
-  --color-accent-line: #d9dcef;
+  --color-accent: #7057f5;
+  --color-accent-strong: #5b45d9;
+  --color-accent-soft: #f1edff;
+  --color-accent-line: #ddd5f7;
 
-  --color-canvas-dark: #1b2440;
+  --color-canvas-dark: #172033;
   --color-text-on-dark: #f0eff8;
 
   --color-cream: #fafaf7;
@@ -64,12 +64,12 @@ body {
   background:
     radial-gradient(
       1100px 520px at 12% -12%,
-      rgba(79, 70, 229, 0.07) 0%,
+      rgba(112, 87, 245, 0.07) 0%,
       transparent 58%
     ),
     radial-gradient(
       900px 480px at 96% -6%,
-      rgba(27, 36, 64, 0.05) 0%,
+      rgba(23, 32, 51, 0.05) 0%,
       transparent 55%
     ),
     var(--canvas);
