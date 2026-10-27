@@ -682,7 +682,7 @@ function SolutionSection() {
   return (
     <section
       id="solution"
-      className="relative scroll-mt-24 overflow-hidden bg-[linear-gradient(180deg,#f5f4ff_0%,#ffffff_42%,#fbfaff_100%)] py-20 sm:py-24 lg:py-28"
+      className="relative scroll-mt-24 overflow-hidden bg-[radial-gradient(900px_520px_at_10%_0%,rgba(233,229,255,0.95),transparent_62%),radial-gradient(820px_520px_at_94%_12%,rgba(255,230,213,0.62),transparent_58%),linear-gradient(180deg,rgba(255,255,255,0.70)_0%,#f7f3ff_30%,#fff8f3_100%)] py-20 sm:py-24 lg:py-28"
     >
       <div
         className="scroll-drift absolute right-[-8%] top-14 h-80 w-80 rounded-full bg-lav/80 blur-3xl"
@@ -977,7 +977,7 @@ function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      className="relative scroll-mt-24 overflow-hidden border-y border-navy/8 bg-cream py-20 sm:py-24 lg:py-28"
+      className="relative scroll-mt-24 overflow-hidden border-y border-navy/8 bg-[radial-gradient(900px_520px_at_88%_0%,rgba(221,247,232,0.90),transparent_62%),radial-gradient(800px_480px_at_8%_90%,rgba(220,238,255,0.72),transparent_60%),linear-gradient(180deg,rgba(255,255,255,0.72)_0%,#f0faf5_38%,#edf7ff_100%)] py-20 sm:py-24 lg:py-28"
     >
       <div
         className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(112,87,245,0.22),transparent)]"
@@ -1076,7 +1076,7 @@ function PipelineSection() {
   return (
     <section
       id="pipeline"
-      className="relative scroll-mt-24 overflow-hidden border-y border-navy/8 bg-[radial-gradient(760px_420px_at_6%_8%,rgba(233,229,255,0.78),transparent_62%),radial-gradient(720px_420px_at_96%_78%,rgba(221,247,232,0.72),transparent_60%),#fafaf7] py-20 sm:py-24 lg:py-28"
+      className="relative scroll-mt-24 overflow-hidden border-y border-navy/8 bg-[radial-gradient(900px_520px_at_4%_6%,rgba(220,238,255,0.95),transparent_60%),radial-gradient(850px_500px_at_96%_82%,rgba(233,229,255,0.92),transparent_62%),linear-gradient(180deg,rgba(255,255,255,0.70)_0%,#f3f8ff_40%,#f6f2ff_100%)] py-20 sm:py-24 lg:py-28"
     >
       <div
         className="absolute -left-24 top-1/3 h-64 w-64 rounded-full bg-lav/70 blur-3xl"
@@ -1298,7 +1298,7 @@ function FeaturesSection() {
   return (
     <section
       id="features"
-      className="relative scroll-mt-24 overflow-hidden bg-[linear-gradient(180deg,#fbfaff_0%,#f5f4ff_44%,#fdfcf9_100%)] py-20 sm:py-24 lg:py-28"
+      className="relative scroll-mt-24 overflow-hidden bg-[radial-gradient(900px_520px_at_90%_4%,rgba(255,230,213,0.80),transparent_60%),radial-gradient(850px_520px_at_8%_82%,rgba(233,229,255,0.90),transparent_62%),linear-gradient(180deg,rgba(255,255,255,0.68)_0%,#fff7f2_42%,#f6f2ff_100%)] py-20 sm:py-24 lg:py-28"
     >
       <div
         className="absolute -right-24 top-24 h-80 w-80 rounded-full bg-sky/70 blur-3xl"
@@ -1432,7 +1432,7 @@ function TrustSection() {
   return (
     <section
       id="trust"
-      className="relative scroll-mt-24 overflow-hidden border-y border-navy/8 bg-[linear-gradient(120deg,#e9f7ff_0%,#f2fbf7_48%,#fafaf7_100%)] py-20 sm:py-24 lg:py-28"
+      className="relative scroll-mt-24 overflow-hidden border-y border-navy/8 bg-[radial-gradient(880px_520px_at_6%_0%,rgba(220,238,255,0.95),transparent_60%),radial-gradient(800px_500px_at_96%_84%,rgba(221,247,232,0.90),transparent_60%),linear-gradient(180deg,rgba(255,255,255,0.70)_0%,#eef9ff_45%,#edf9f3_100%)] py-20 sm:py-24 lg:py-28"
     >
       <div
         className="absolute -left-24 bottom-10 h-72 w-72 rounded-full bg-mint/80 blur-3xl"
@@ -1748,7 +1748,7 @@ function TechSection() {
   return (
     <section
       id="tech-stack"
-      className="relative scroll-mt-24 overflow-hidden bg-cream py-20 sm:py-24 lg:py-28"
+      className="relative scroll-mt-24 overflow-hidden bg-[radial-gradient(900px_520px_at_12%_4%,rgba(255,230,213,0.75),transparent_60%),radial-gradient(760px_460px_at_92%_88%,rgba(221,247,232,0.70),transparent_60%),linear-gradient(180deg,rgba(255,255,255,0.72)_0%,#fffaf5_44%,#f7fbf8_100%)] py-20 sm:py-24 lg:py-28"
     >
       <div className="mx-auto w-full max-w-[1220px] px-5 sm:px-8">
         <Reveal variant="blur">
@@ -1780,7 +1780,7 @@ function GitHubSection() {
   return (
     <section
       id="github"
-      className="scroll-mt-24 border-y border-navy/8 bg-[linear-gradient(180deg,#ffffff_0%,#fbfaff_100%)] py-20 sm:py-24 lg:py-28"
+      className="scroll-mt-24 border-y border-navy/8 bg-[radial-gradient(900px_520px_at_12%_8%,rgba(233,229,255,0.85),transparent_60%),radial-gradient(800px_500px_at_92%_90%,rgba(220,238,255,0.75),transparent_60%),linear-gradient(180deg,rgba(255,255,255,0.80)_0%,#f8f5ff_48%,#f1f8ff_100%)] py-20 sm:py-24 lg:py-28"
     >
       <div className="mx-auto w-full max-w-[1220px] px-5 sm:px-8">
         <Reveal variant="blur">
@@ -1871,7 +1871,10 @@ function GitHubSection() {
 
 function FinalCta() {
   return (
-    <section id="start" className="scroll-mt-24 bg-cream py-20 sm:py-24 lg:py-28">
+    <section
+      id="start"
+      className="scroll-mt-24 bg-[radial-gradient(900px_540px_at_18%_0%,rgba(233,229,255,0.90),transparent_60%),radial-gradient(720px_460px_at_90%_90%,rgba(255,230,213,0.62),transparent_60%),linear-gradient(180deg,rgba(255,255,255,0.76)_0%,#faf7ff_45%,#fff9f3_100%)] py-20 sm:py-24 lg:py-28"
+    >
       <div className="mx-auto w-full max-w-[1220px] px-5 sm:px-8">
         <Reveal variant="blur">
           <div className="relative overflow-hidden rounded-[2.25rem] border border-brand/15 bg-[linear-gradient(125deg,#e9e5ff_0%,#f4f1ff_38%,#e7f4ff_100%)] px-6 py-14 sm:px-10 sm:py-16 lg:px-14 lg:py-20">
