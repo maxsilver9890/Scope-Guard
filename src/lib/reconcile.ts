@@ -47,6 +47,7 @@ export class ScopeReconciliationError extends Error {
   }
 }
 type CommitmentSection = "inScope" | "outOfScope" | "requirements" | "acceptanceCriteria";
+type PreservableSection = CommitmentSection | "assumptions";
 const commitmentSections: CommitmentSection[] = [
   "inScope", "outOfScope", "requirements", "acceptanceCriteria",
 ];
@@ -71,7 +72,11 @@ function preserveUnchallengedConfirmedItems(
   findings: Finding[],
 ): Scope {
   const next = { ...generated };
-  for (const section of commitmentSections) {
+  const preservationSections: PreservableSection[] = [
+    ...commitmentSections,
+    "assumptions",
+  ];
+  for (const section of preservationSections) {
     const items = [...next[section]];
     for (const item of previous[section]) {
       if (item.status !== "confirmed") continue;

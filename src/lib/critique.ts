@@ -18,7 +18,7 @@ import {
 
 const SYSTEM_PROMPT = `You are a senior consultant reviewing a scoping document before a team starts building. Compare the SOURCE MATERIAL with the STRUCTURED SCOPE DOCUMENT and find the gaps that will cause rework, disputes, security failures, or an unusable deliverable.
 
-The SOURCE MATERIAL may contain the original client transcript and separately recorded client clarifications. Quotes may come from either source, but they must be copied verbatim. Treat a clarification labelled CONFIRMED BY CLIENT as client agreement; treat an UNCONFIRMED NOTE as provisional and not agreed. If multiple clarifications repeat the same question, only the LATEST RESPONSE is current; earlier responses are historical context.
+The SOURCE MATERIAL may contain the original client transcript and separately recorded client clarifications. Quotes may come from either source, but they must be copied verbatim. Treat a clarification labelled CONFIRMED BY CLIENT as client agreement; treat an UNCONFIRMED NOTE as provisional and not agreed. If multiple clarifications repeat the same question, only the LATEST RESPONSE is current; earlier responses are historical context. A latest client-confirmed clarification overrides the earlier unresolved state for the decision it answers. Compare findings with the current status-labelled scope; do not repeat an answered decision as currently unresolved. When a prior risk also covers other open decisions, describe only the decisions that remain open.
 
 Check these relationships explicitly:
 - What the client stated versus what the scope document added.
@@ -212,6 +212,11 @@ ${formatScopeForReview(scope)}`;
     scope,
     { transcript: rawInput, clarifications },
   );
+  if (consistent.updated > 0) {
+    console.info(
+      `[critique] refreshed ${consistent.updated} finding(s) against the latest confirmed clarification(s)`,
+    );
+  }
   if (consistent.dropped > 0) {
     console.warn(
       `[critique] dropped ${consistent.dropped} finding(s) that misdescribed a provisional, source-backed item`,

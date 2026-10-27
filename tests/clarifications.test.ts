@@ -15,6 +15,11 @@ import {
 import { ScopeReconciliationError } from "../src/lib/reconcile.ts";
 import { formatClarificationsForReview } from "../src/lib/scope-format.ts";
 import type { Clarification, Finding, Scope } from "../src/lib/schema.ts";
+import {
+  FITNESS_GATEWAY_ANSWER,
+  FITNESS_GATEWAY_QUESTION,
+  FITNESS_SCOPE_SOURCE,
+} from "./fixtures/scope-correctness.ts";
 
 const TRANSCRIPT = `Dana: We need a dashboard for the team.
 Dana: I need a report for the Monday meeting. Nothing fancy.`;
@@ -536,6 +541,90 @@ test("resolveScope reports resolved, retained, and new findings", async () => {
       clarificationId: "c1",
     },
   ]);
+});
+
+test("gateway clarification refreshes aggregate risks while preserving other open decisions", async () => {
+  const questions = [
+    "Which hosting provider will be used?",
+    "Which subscription plans and pricing will be offered?",
+    "Which metrics will appear on the progress dashboard?",
+  ];
+  const previous = scope({
+    assumptions: [
+      {
+        text: "Initial delivery is required within 4 weeks.",
+        status: "confirmed",
+        sourceQuote: "within 4 weeks",
+      },
+      {
+        text: "The total project budget is ₹50,000.",
+        status: "confirmed",
+        sourceQuote: "a total budget of ₹50,000",
+      },
+    ],
+    openQuestions: [
+      { text: FITNESS_GATEWAY_QUESTION, status: "unresolved" },
+      ...questions.map((text) => ({ text, status: "unresolved" as const })),
+    ],
+  });
+  const finalScope: Scope = {
+    ...previous,
+    assumptions: [],
+    inScope: [
+      {
+        text: "Razorpay will be used as the payment gateway for launch.",
+        status: "confirmed",
+        sourceQuote: "We will use Razorpay as the payment gateway for the initial launch.",
+      },
+    ],
+    requirements: [
+      {
+        text: "Support secure online payments for subscription purchases.",
+        status: "confirmed",
+        sourceQuote: "The website must support secure online payments for subscription purchases.",
+      },
+    ],
+    openQuestions: questions.map((text) => ({ text, status: "unresolved" })),
+  };
+  const staleFinding: Finding = {
+    type: "missing-info",
+    description:
+      "Critical architectural and product decisions including the payment gateway, hosting provider, subscription plans, and progress dashboard metrics remain completely unresolved.",
+    whyItMatters: "These decisions affect project architecture and delivery.",
+    sourceSnippet:
+      "We haven't decided which payment gateway to use, which hosting provider to choose, or what subscription plans to offer. We also haven't finalized the exact metrics that should appear on the progress dashboard.",
+  };
+
+  const result = await resolveScope(
+    request({
+      input: FITNESS_SCOPE_SOURCE,
+      scope: previous,
+      findings: [staleFinding],
+      question: FITNESS_GATEWAY_QUESTION,
+      answer: FITNESS_GATEWAY_ANSWER,
+      confirmed: true,
+    }),
+    deps(finalScope, [staleFinding]),
+  );
+
+  assert.equal(result.scope.openQuestions.some((q) => /gateway/i.test(q.text)), false);
+  assert.equal(result.scope.openQuestions.length, 3);
+  assert.equal(result.scope.inScope[0].status, "confirmed");
+  assert.equal(result.scope.inScope[0].sourceKind, "clarification");
+  assert.deepEqual(result.scope.assumptions.map((entry) => entry.status), [
+    "confirmed", "confirmed",
+  ]);
+  assert.equal(result.comparison.questionResolved, true);
+  assert.equal(result.findings.length, 1);
+  assert.match(result.findings[0].description, /hosting provider/i);
+  assert.match(result.findings[0].description, /subscription plans and pricing/i);
+  assert.match(result.findings[0].description, /progress dashboard/i);
+  assert.doesNotMatch(result.findings[0].description, /payment gateway/i);
+  assert.equal(result.comparison.findings.changed.length, 1);
+  assert.doesNotMatch(
+    result.comparison.findings.changed[0].after.description,
+    /payment gateway.*unresolved/i,
+  );
 });
 
 test("the original transcript string is never rewritten", () => {

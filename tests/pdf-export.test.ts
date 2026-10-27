@@ -4,6 +4,9 @@ import { test } from "node:test";
 import { scopeToPdfDefinition } from "../src/lib/pdf-export.ts";
 import { formatPdfPreflightSummary, getPdfExportPreflight } from "../src/lib/clarifications.ts";
 import type { Scope } from "../src/lib/schema.ts";
+import type { Finding } from "../src/lib/schema.ts";
+import type { ScopeComparison } from "../src/lib/diff.ts";
+import { FITNESS_GATEWAY_QUESTION } from "./fixtures/scope-correctness.ts";
 
 function collectText(value: unknown): string[] {
   if (typeof value === "string") return [value];
@@ -309,4 +312,102 @@ test("change summary distinguishes a section move from a new or resolved scope d
   assert.match(content, /Requirements → In Scope/);
   assert.doesNotMatch(content, /Resolved  Requirements: Product filtering/);
   assert.match(content, /remains proposed pending client approval/);
+});
+
+test("PDF output keeps explicit constraints confirmed and shows only current findings after resolution", () => {
+  const oldAggregate: Finding = {
+    type: "missing-info",
+    description:
+      "Critical decisions including the payment gateway, hosting provider, subscription plans, and dashboard metrics remain completely unresolved.",
+    whyItMatters: "These decisions affect architecture and delivery.",
+    sourceSnippet: "The client has not decided which provider or hosting service to use.",
+  };
+  const currentResidual: Finding = {
+    ...oldAggregate,
+    description:
+      "Other decisions cited in this risk remain open: Which hosting provider will be used?; Which subscription plans and pricing will be offered?; Which metrics will appear on the progress dashboard?.",
+    whyItMatters:
+      "These remaining open decisions may affect scope, dependencies, cost, or acceptance criteria.",
+  };
+  const scope: Scope = {
+    problemStatement: "The project needs a clear fitness coaching website scope.",
+    inScope: [
+      {
+        text: "Razorpay will be used as the payment gateway for launch.",
+        status: "confirmed",
+        sourceQuote: "We will use Razorpay as the payment gateway for the initial launch.",
+        sourceKind: "clarification",
+        clarificationId: "c1",
+      },
+    ],
+    outOfScope: [],
+    assumptions: [
+      {
+        text: "Initial delivery is required within four weeks.",
+        status: "confirmed",
+        sourceQuote: "within 4 weeks",
+        sourceKind: "transcript",
+      },
+      {
+        text: "The total project budget is ₹50,000.",
+        status: "confirmed",
+        sourceQuote: "a total budget of ₹50,000",
+        sourceKind: "transcript",
+      },
+      {
+        text: "The client estimates approximately 10,000 users in the first month after launch.",
+        status: "confirmed",
+        sourceQuote: "We expect around 10,000 users in the first month after launch.",
+        sourceKind: "transcript",
+      },
+    ],
+    openQuestions: [
+      { text: "Which hosting provider will be used?", status: "unresolved" },
+      { text: "Which subscription plans and pricing will be offered?", status: "unresolved" },
+      { text: "Which metrics will appear on the progress dashboard?", status: "unresolved" },
+    ],
+    requirements: [],
+    acceptanceCriteria: [],
+    clarifications: [
+      {
+        id: "c1",
+        question: FITNESS_GATEWAY_QUESTION,
+        answer: "Client-approved decision: use the selected payment gateway for launch.",
+        confirmed: true,
+      },
+    ],
+  };
+  const comparison: ScopeComparison = {
+    items: [],
+    findings: {
+      resolved: [oldAggregate],
+      remaining: [],
+      changed: [{ before: oldAggregate, after: currentResidual }],
+      added: [],
+      unmatched: [],
+    },
+    questionResolved: true,
+    clarification: {
+      question: FITNESS_GATEWAY_QUESTION,
+      answer: "Client-approved decision: use the selected payment gateway for launch.",
+      confirmed: true,
+    },
+    summary: [
+      "The selected payment gateway is resolved; hosting, plans and metrics remain open.",
+    ],
+  };
+
+  const content = collectText(
+    scopeToPdfDefinition(scope, [currentResidual], comparison).content,
+  ).join("\n");
+
+  assert.match(content, /Initial delivery is required within four weeks/);
+  assert.match(content, /The total project budget is ₹50,000/);
+  assert.match(content, /estimates approximately 10,000 users/);
+  assert.match(content, /Confirmed/);
+  assert.match(content, /Current finding: Other decisions cited in this risk remain open/);
+  assert.match(content, /hosting provider/);
+  assert.match(content, /subscription plans and pricing/);
+  assert.doesNotMatch(content, /payment gateway, hosting provider.*remain completely unresolved/i);
+  assert.match(content, /A previously reported concern related to/);
 });

@@ -45,7 +45,9 @@ export type Clarification = z.infer<typeof clarificationSchema>;
 const SECTION_STATUS_RULES = {
   inScope: ["confirmed", "inferred", "proposed"],
   outOfScope: ["confirmed", "proposed"],
-  assumptions: ["inferred"],
+  // An explicitly stated constraint can be recorded under Assumptions when
+  // the generator places it there; its source status still remains confirmed.
+  assumptions: ["confirmed", "inferred"],
   openQuestions: ["unresolved"],
   requirements: ["confirmed", "inferred", "proposed"],
   acceptanceCriteria: ["confirmed", "proposed"],

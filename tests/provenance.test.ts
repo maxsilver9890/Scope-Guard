@@ -17,6 +17,11 @@ import type {
   Scope,
   ScopeItem,
 } from "../src/lib/schema.ts";
+import { rawScopeSchema, scopeSchema } from "../src/lib/schema.ts";
+import {
+  FITNESS_SCOPE_SOURCE,
+  OTHER_EXPLICIT_CONSTRAINTS,
+} from "./fixtures/scope-correctness.ts";
 import {
   GENUINE_TRAINING_GAP,
   MISLEADING_TRAINING_FINDING,
@@ -386,6 +391,56 @@ test("repairScopeProvenance supplies a rationale for assumptions without one", (
   assert.match(result.scope.assumptions[0].rationale ?? "", /provisional/i);
 });
 
+test("explicit constraints and estimates keep confirmed provenance in assumptions", () => {
+  const scope = scopeWith({
+    assumptions: [
+      item("Initial delivery is required within 4 weeks.", "confirmed", {
+        sourceQuote: "within 4 weeks",
+      }),
+      item("The total project budget is ₹50,000.", "confirmed", {
+        sourceQuote: "a total budget of ₹50,000",
+      }),
+      item("The client estimates approximately 10,000 users in the first month after launch.", "confirmed", {
+        sourceQuote: "We expect around 10,000 users in the first month after launch.",
+      }),
+    ],
+  });
+
+  const result = repairScopeProvenance(scope, FITNESS_SCOPE_SOURCE).scope;
+  const valid = scopeSchema.safeParse(result);
+
+  assert.equal(valid.success, true);
+  assert.deepEqual(result.assumptions.map((entry) => entry.status), [
+    "confirmed", "confirmed", "confirmed",
+  ]);
+  assert.deepEqual(result.assumptions.map((entry) => entry.sourceKind), [
+    "transcript", "transcript", "transcript",
+  ]);
+  assert.match(result.assumptions[2].text, /estimates approximately 10,000 users/i);
+  assert.doesNotMatch(result.assumptions[2].text, /guaranteed capacity|performance requirement/i);
+});
+
+test("explicit constraints in another domain also remain confirmed", () => {
+  const result = repairScopeProvenance(
+    scopeWith({
+      assumptions: [
+        item("The booking portal must be ready before the spring term.", "confirmed", {
+          sourceQuote: "must be ready before the spring term",
+        }),
+        item("The approved project cap is $12,000.", "confirmed", {
+          sourceQuote: "the approved project cap is $12,000",
+        }),
+      ],
+    }),
+    OTHER_EXPLICIT_CONSTRAINTS,
+  ).scope;
+
+  assert.deepEqual(result.assumptions.map((entry) => entry.status), [
+    "confirmed", "confirmed",
+  ]);
+  assert.ok(result.assumptions.every((entry) => entry.sourceKind === "transcript"));
+});
+
 test("findUnsupportedDetail detects invented cadence, thresholds, and formats", () => {
   assert.equal(findUnsupportedDetail("Generate a weekly report", SOURCE), "weekly");
   assert.equal(findUnsupportedDetail("Pages load in under 3 seconds", SOURCE), "3 seconds");
@@ -477,8 +532,6 @@ test("repairScopeProvenance keeps confirmed non-tentative language", () => {
   assert.equal(result.downgraded, 0);
   assert.equal(result.scope.inScope[0].status, "confirmed");
 });
-
-import { rawScopeSchema, scopeSchema } from "../src/lib/schema.ts";
 
 test("raw scope validation allows repair before semantic validation", () => {
   const candidate = {

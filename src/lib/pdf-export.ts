@@ -65,9 +65,12 @@ function changeContent(comparison: ScopeComparison): Content[] {
   if (comparison.questionResolved) result.push({ text: "Resolved", style: "subhead" }, text(`Open question resolved: ${comparison.clarification.question}`));
   else result.push({ text: "Retained", style: "subhead" }, text(`Open question remains: ${comparison.clarification.question}`));
   const changes = [
-    ...comparison.findings.resolved.map((f) => ({ label: "Resolved", value: f.description })),
+    ...comparison.findings.resolved.map(() => ({
+      label: "Resolved",
+      value: `A previously reported concern related to “${comparison.clarification.question}” is addressed by the confirmed clarification.`,
+    })),
     ...comparison.findings.remaining.map((f) => ({ label: "Retained", value: f.description })),
-    ...comparison.findings.changed.map((f) => ({ label: "Changed or reworded", value: `${f.before.description} → ${f.after.description}` })),
+    ...comparison.findings.changed.map((f) => ({ label: "Changed or reworded", value: `Current finding: ${f.after.description}` })),
     ...comparison.findings.added.map((f) => ({ label: "New", value: f.description })),
     ...comparison.findings.unmatched.map((f) => ({ label: "Not re-reported", value: f.description })),
     ...comparison.items.map((item) => ({ label: item.kind === "added" ? "New" : item.kind === "removed" ? "Removed" : item.kind === "moved" ? "Moved between sections" : "Changed", value: `${sectionNames[item.section] ?? item.section}${item.afterSection ? ` → ${sectionNames[item.afterSection] ?? item.afterSection}` : ""}: ${item.beforeText ?? ""}${item.beforeText && item.afterText ? " → " : ""}${item.afterText ?? ""}` })),

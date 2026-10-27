@@ -1025,12 +1025,13 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
                   Resolved
                 </p>
                 <ul className="mt-1.5 space-y-2">
-                  {findings.resolved.map((finding, index) => (
-                    <ComparisonFindingRow
+                  {findings.resolved.map((_, index) => (
+                    <li
                       key={`resolved-${index}`}
-                      finding={finding}
-                      label="Resolved"
-                    />
+                      className="rounded-md border border-line bg-surface px-3.5 py-3 text-[13px] leading-5 text-ink/85"
+                    >
+                      A previously reported concern related to “{comparison.clarification.question}” is addressed by the confirmed clarification.
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -1064,17 +1065,8 @@ function ComparisonPanel({ comparison }: { comparison: ScopeComparison }) {
                       key={`changed-${index}`}
                       className="rounded-md border border-line bg-surface px-3.5 py-3"
                     >
-                      <p className="text-[10.5px] uppercase tracking-[0.14em] text-muted">
-                        Before
-                      </p>
-                      <p className="mt-1 text-[13px] leading-5 text-muted">
-                        {change.before.description}
-                      </p>
-                      <p className="mt-2 text-[10.5px] uppercase tracking-[0.14em] text-forest/70">
-                        After
-                      </p>
-                      <p className="mt-1 text-[13px] leading-5 text-ink/85">
-                        {change.after.description}
+                      <p className="text-[13px] leading-5 text-ink/85">
+                        Current finding: {change.after.description}
                       </p>
                     </li>
                   ))}

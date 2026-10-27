@@ -23,12 +23,13 @@ Commitment status:
 Section rules:
 - inScope and requirements: only confirmed, inferred, or proposed.
 - outOfScope: confirmed only if the client explicitly excluded it; otherwise use proposed.
-- assumptions: inferred only, always with a rationale.
+- assumptions: inferred interpretations require a rationale; if an item in this section is directly stated in the source, keep its status confirmed and include a sourceQuote.
 - openQuestions: unresolved only.
 - acceptanceCriteria: proposed unless the client explicitly agreed to that exact criterion; confirmed requires a sourceQuote.
 
 Fidelity rules:
 - Never invent quantitative targets, deadlines, budgets, synchronization intervals, export formats, testing percentages, SLAs, or security guarantees.
+- Preserve client-stated estimates as estimates; do not turn an expected audience or usage estimate into guaranteed capacity or a performance requirement.
 - Never turn an aspiration into a confirmed commitment. "If it's easy", "would love", "maybe", and "I think" are not agreement.
 - A feature described only as "would be useful", "would be nice", or "I'd like" is a requested suggestion, not an approved commitment; mark it proposed. A client asking to include something as a proposal, option, or recommendation likewise does not confirm it. Keep an explicit firm instruction or commitment confirmed when the source clearly states it.
 - Tentative language such as "let's say yes for now", "we can always take it out", or "maybe not in the first version" is not confirmation. Mark that item proposed.
@@ -69,7 +70,7 @@ const OUTPUT_SHAPE = `Return ONLY a single valid JSON object with exactly this s
   "problemStatement": "string",
   "inScope": [{"text": "string", "status": "confirmed", "sourceQuote": "string"}],
   "outOfScope": [{"text": "string", "status": "proposed", "rationale": "string"}],
-  "assumptions": [{"text": "string", "status": "inferred", "rationale": "string", "sourceQuote": "string"}],
+  "assumptions": [{"text": "string", "status": "confirmed" | "inferred", "rationale": "string (required for inferred)", "sourceQuote": "string (required for confirmed)"}],
   "openQuestions": [{"text": "string", "status": "unresolved"}],
   "requirements": [{"text": "string", "status": "confirmed", "sourceQuote": "string"}],
   "acceptanceCriteria": [{"text": "string", "status": "proposed", "rationale": "string"}]

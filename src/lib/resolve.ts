@@ -8,6 +8,7 @@ import { generateScope } from "./generate";
 import { reconcileCritique } from "./reconcile";
 import {
   enforceFindingProvenance,
+  filterFindingsInconsistentWithScope,
   isQuoteInSource,
   normalizeQuote,
   repairScopeProvenance,
@@ -88,6 +89,7 @@ function issuesFrom(error: {
 type CommitmentSectionKey =
   | "inScope"
   | "outOfScope"
+  | "assumptions"
   | "requirements"
   | "acceptanceCriteria";
 
@@ -137,6 +139,11 @@ const COMMITMENT_SECTIONS: CommitmentSectionKey[] = [
   "acceptanceCriteria",
 ];
 
+const PRESERVED_CONFIRMED_SECTIONS: CommitmentSectionKey[] = [
+  ...COMMITMENT_SECTIONS,
+  "assumptions",
+];
+
 /**
  * Keep a previously source-verified client commitment unless the latest
  * confirmed clarification produced a related, clarification-sourced update.
@@ -148,7 +155,7 @@ function preserveConfirmedCommitments(
 ): Scope {
   const next = { ...generated };
 
-  for (const section of COMMITMENT_SECTIONS) {
+  for (const section of PRESERVED_CONFIRMED_SECTIONS) {
     const items = [...next[section]];
     for (const previousItem of previous[section]) {
       if (previousItem.status !== "confirmed") continue;
@@ -334,10 +341,16 @@ export async function resolveScope(
     verified.data,
     { clarifications, deadline: options.deadline },
   );
+  const verifiedFindings = enforceFindingProvenance(generatedFindings, corpus).findings;
+  const currentFindings = filterFindingsInconsistentWithScope(
+    verifiedFindings,
+    verified.data,
+    corpus,
+  ).findings;
   const reconciled = await reconcileCritique(
     data.input,
     verified.data,
-    enforceFindingProvenance(generatedFindings, corpus).findings,
+    currentFindings,
     { clarifications, deadline: options.deadline },
     { generateScope: deps.generateScope, critiqueScope: deps.critiqueScope },
   );
