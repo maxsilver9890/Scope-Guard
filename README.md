@@ -243,6 +243,8 @@ The provider client retries transient failures within the call and pipeline budg
 
 The analysis model must support OpenAI-compatible chat completions, `response_format` with strict JSON schema, `max_tokens`, and optional reasoning that can be disabled. OpenRouter determines structured-output support per endpoint, not just per model.
 
+Direct Gemini 3 endpoints use Google's documented OpenAI-compatible `reasoning_effort` parameter. Scope Guard sends `reasoning_effort: "minimal"` by default because Gemini 3 otherwise applies its default thinking budget, which can consume time and output tokens before the JSON scope is returned. The parameter is only added for direct Gemini 3 endpoints; OpenRouter continues to use its `reasoning` control.
+
 At the time of the model review, the recommended paid pairing was:
 
 | Role | Model | Reason |
@@ -373,7 +375,7 @@ Invalid requests return `400` with a concise error. Reconciliation failures retu
 - No skipped review: critique runs after generation, and reconciliation is bounded to one repair pass.
 - No rewriting the source: the original transcript is preserved exactly.
 - No destructive failure: failed analysis or reconciliation leaves the previous valid results and clarification data intact.
-- No secret logging: API keys, full transcripts, and raw reasoning are not logged. Diagnostics are limited to model metadata, finish reason, token counts, and counts of dropped or downgraded items.
+- No secret logging: API keys, full transcripts, raw reasoning, and unstructured provider bodies are not logged. Diagnostics are limited to model metadata, endpoint host, HTTP status, finish reason, request parameter names, prompt size, token counts, and counts of dropped or downgraded items.
 
 ## Known Limitations
 

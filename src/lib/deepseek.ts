@@ -42,6 +42,8 @@ export type ChatMessage = {
   content: string;
 };
 
+export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "none";
+
 export type ChatCompletionUsage = {
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -74,6 +76,11 @@ export type ChatCompletionOptions = {
    * Pass `null` to omit the parameter entirely.
    */
   reasoning?: Record<string, unknown> | null;
+  /**
+   * OpenAI-compatible reasoning effort. Direct Gemini 3 endpoints default to
+   * `"minimal"`; other providers omit it. Pass `null` to omit it explicitly.
+   */
+  reasoningEffort?: ReasoningEffort | null;
   /** Per-call budget. Defaults to DEEPSEEK_TIMEOUT_MS. */
   timeoutMs?: number;
   /** Absolute deadline shared by the whole analysis pipeline. */
@@ -114,6 +121,35 @@ const RETRYABLE_CODES = new Set([
   "overloaded",
   "provider_overloaded",
 ]);
+
+function isOpenRouterEndpoint(baseUrl: string): boolean {
+  try {
+    return /(^|\.)openrouter\.ai$/i.test(new URL(baseUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isDirectGemini3Endpoint(baseUrl: string, model: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname;
+    if (host !== "generativelanguage.googleapis.com") {
+      return false;
+    }
+    const normalized = model.replace(/^models\//i, "");
+    return /^gemini-3(?:\.|-|$)/i.test(normalized);
+  } catch {
+    return false;
+  }
+}
+
+function endpointLabel(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return "invalid-url";
+  }
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -189,7 +225,8 @@ function describeProviderError(
     return code ? `${summary} (code: ${String(code)})` : summary;
   }
 
-  return truncate(raw, 200) || "no error details";
+  // Never log an unstructured provider body: it can echo request content.
+  return `no structured provider error (${raw.length} body chars)`;
 }
 
 function isRetryableError(parsed: ProviderResponse | null): boolean {
@@ -246,13 +283,29 @@ export async function chatCompletion(
 
   // OpenRouter reasoning models can spend the entire completion budget on
   // hidden reasoning and then return null content. Disable it by default.
-  const isOpenRouter = /openrouter\.ai/i.test(baseUrl);
+  const isOpenRouter = isOpenRouterEndpoint(baseUrl);
   const reasoning =
     options.reasoning === undefined
       ? isOpenRouter
         ? { enabled: false }
         : undefined
       : options.reasoning;
+  const reasoningEffort =
+    options.reasoningEffort === undefined
+      ? isDirectGemini3Endpoint(baseUrl, model)
+        ? "minimal"
+        : undefined
+      : options.reasoningEffort;
+  const responseFormat = options.jsonSchema
+    ? "json_schema"
+    : options.jsonMode
+      ? "json_object"
+      : "none";
+  const promptChars = messages.reduce(
+    (total, message) => total + message.content.length,
+    0,
+  );
+  const endpoint = endpointLabel(baseUrl);
 
   const callDeadline = Math.min(
     Date.now() + timeoutMs,
@@ -281,6 +334,9 @@ export async function chatCompletion(
     if (reasoning) {
       body.reasoning = reasoning;
     }
+    if (reasoningEffort) {
+      body.reasoning_effort = reasoningEffort;
+    }
     if (options.jsonSchema) {
       body.response_format = {
         type: "json_schema",
@@ -297,6 +353,16 @@ export async function chatCompletion(
     const startedAt = Date.now();
     let response: Response;
     let raw: string;
+
+    console.info(
+      `[llm] request model=${model} endpoint=${endpoint} attempt=${attempt}/${maxAttempts} timeout=${attemptTimeout}ms max_tokens=${maxTokens} temperature=${String(
+        body.temperature,
+      )} response_format=${responseFormat} reasoning=${
+        reasoning ? JSON.stringify(reasoning) : "omitted"
+      } reasoning_effort=${reasoningEffort ?? "omitted"} messages=${
+        messages.length
+      } prompt_chars=${promptChars}`,
+    );
 
     try {
       response = await fetchImpl(`${baseUrl}/chat/completions`, {
@@ -315,7 +381,9 @@ export async function chatCompletion(
         (error.name === "TimeoutError" || error.name === "AbortError");
 
       console.error(
-        `[llm] model=${model} request failed after ${Date.now() - startedAt}ms: ${
+        `[llm] model=${model} endpoint=${endpoint} request failed after ${
+          Date.now() - startedAt
+        }ms attempt=${attempt}/${maxAttempts} timeout=${timedOut ? "yes" : "no"}: ${
           timedOut ? "timeout" : truncate(String(error), 160)
         }`,
       );
@@ -356,17 +424,37 @@ export async function chatCompletion(
     const finishReason = choice?.finish_reason;
     const returnedModel = parsed?.model ?? model;
     const usage = parsed?.usage;
+    const choiceCount = parsed?.choices?.length ?? 0;
+    const contentChars = typeof content === "string" ? content.length : 0;
+    const reasoningChars =
+      typeof reasoningText === "string" ? reasoningText.length : 0;
+
+    if (!parsed) {
+      console.warn(
+        `[llm] model=${model} endpoint=${endpoint} returned a non-JSON body status=${response.status} body_chars=${raw.length}`,
+      );
+    }
 
     console.info(
-      `[llm] model=${model} returned=${returnedModel} finish=${
-        finishReason ?? "?"
-      } ${usageSummary(usage)} ${Date.now() - startedAt}ms attempt=${attempt}`,
+      `[llm] response model=${model} returned=${returnedModel} status=${
+        response.status
+      } finish=${finishReason ?? "?"} ${usageSummary(
+        usage,
+      )} choices=${choiceCount} content_chars=${contentChars} reasoning_chars=${reasoningChars} ${
+        Date.now() - startedAt
+      }ms attempt=${attempt}`,
     );
 
     if (!response.ok) {
       const detail = describeProviderError(parsed, raw);
       const retryable =
         RETRYABLE_STATUS.has(response.status) || isRetryableError(parsed);
+
+      console.warn(
+        `[llm] provider error model=${returnedModel} endpoint=${endpoint} status=${
+          response.status
+        } code=${String(parsed?.error?.code ?? "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
+      );
 
       if (retryable && attempt < maxAttempts) {
         const delay = retryDelay(attempt, callDeadline);
@@ -389,7 +477,13 @@ export async function chatCompletion(
 
     if (parsed?.error) {
       const detail = describeProviderError(parsed, raw);
-      if (isRetryableError(parsed) && attempt < maxAttempts) {
+      const retryable = isRetryableError(parsed);
+      console.warn(
+        `[llm] provider error model=${returnedModel} endpoint=${endpoint} status=${
+          response.status
+        } code=${String(parsed.error.code ?? "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
+      );
+      if (retryable && attempt < maxAttempts) {
         const delay = retryDelay(attempt, callDeadline);
         if (delay === null) {
           throw new ModelProviderError(

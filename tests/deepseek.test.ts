@@ -95,9 +95,171 @@ test("SCOPE_GUARD_MODEL overrides the existing analysis model", async () => {
         },
       });
       assert.deepEqual(requestedBody.reasoning, { enabled: false });
+      assert.equal("reasoning_effort" in requestedBody, false);
     },
   );
 });
+
+test("direct Gemini 3 requests send documented minimal reasoning effort", async () => {
+  await withEnv(
+    {
+      DEEPSEEK_MODEL: "gemini-3.8-flash",
+      SCOPE_GUARD_MODEL: null,
+      DEEPSEEK_BASE_URL:
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+    },
+    async () => {
+      let requestedBody: Record<string, unknown> = {};
+      const messages = [
+        { role: "system" as const, content: "Return a scope as JSON." },
+        { role: "user" as const, content: "A client brief." },
+      ];
+      const fetcher: typeof fetch = async (_input, init) => {
+        requestedBody = JSON.parse(String(init?.body)) as Record<
+          string,
+          unknown
+        >;
+        return successResponse();
+      };
+
+      await chatCompletion(messages, {
+        fetchImpl: fetcher,
+        maxAttempts: 1,
+        temperature: 0.2,
+        maxTokens: 5000,
+        jsonMode: true,
+      });
+
+      assert.equal(requestedBody.model, "gemini-3.8-flash");
+      assert.equal(requestedBody.temperature, 0.2);
+      assert.equal(requestedBody.max_tokens, 5000);
+      assert.equal(requestedBody.stream, false);
+      assert.deepEqual(requestedBody.response_format, { type: "json_object" });
+      assert.equal(requestedBody.reasoning_effort, "minimal");
+      assert.equal("reasoning" in requestedBody, false);
+    },
+  );
+});
+
+test("retryable provider errors log status and redact prompt content and keys", async () => {
+  await withEnv(
+    {
+      DEEPSEEK_MODEL: "gemini-3.8-flash",
+      SCOPE_GUARD_MODEL: null,
+      DEEPSEEK_BASE_URL:
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+    },
+    async () => {
+      const logs: string[] = [];
+      const originalInfo = console.info;
+      const originalWarn = console.warn;
+      const originalError = console.error;
+      const sensitiveText = "Confidential client transcript text";
+      const apiKey = "test-key-not-a-real-credential";
+
+      console.info = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
+      console.warn = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
+      console.error = (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      };
+
+      try {
+        let calls = 0;
+        const fetcher: typeof fetch = async (_input, init) => {
+          calls += 1;
+          const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          assert.equal(body.reasoning_effort, "minimal");
+
+          if (calls === 1) {
+            return new Response(`upstream error: ${sensitiveText}`, {
+              status: 503,
+              headers: { "Content-Type": "text/plain" },
+            });
+          }
+
+          return successResponse("ok");
+        };
+
+        const result = await chatCompletion(
+          [{ role: "user", content: sensitiveText }],
+          {
+            fetchImpl: fetcher,
+            timeoutMs: 5_000,
+            maxAttempts: 2,
+            sleepImpl: async () => undefined,
+          },
+        );
+
+        assert.equal(result.content, "ok");
+        assert.equal(calls, 2);
+        const output = logs.join("\n");
+        assert.match(output, /status=503/);
+        assert.match(output, /retryable=true/);
+        assert.match(output, /reasoning_effort=minimal/);
+        assert.equal(output.includes(apiKey), false);
+        assert.equal(output.includes(sensitiveText), false);
+      } finally {
+        console.info = originalInfo;
+        console.warn = originalWarn;
+        console.error = originalError;
+      }
+    },
+  );
+});
+
+test("a reasoning-only completion fails as an invalid response without retrying", async () => {
+  await withEnv(
+    {
+      DEEPSEEK_MODEL: "gemini-3.8-flash",
+      SCOPE_GUARD_MODEL: null,
+      DEEPSEEK_BASE_URL:
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+    },
+    async () => {
+      let calls = 0;
+      const fetcher: typeof fetch = async () => {
+        calls += 1;
+        return new Response(
+          JSON.stringify({
+            model: "gemini-3.8-flash",
+            choices: [
+              {
+                finish_reason: "stop",
+                message: { content: null, reasoning: "internal reasoning" },
+              },
+            ],
+            usage: {
+              prompt_tokens: 100,
+              completion_tokens: 5000,
+              total_tokens: 5100,
+              completion_tokens_details: { reasoning_tokens: 5000 },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      };
+
+      await assert.rejects(
+        chatCompletion([{ role: "user", content: "hi" }], {
+          fetchImpl: fetcher,
+          timeoutMs: 5_000,
+          maxAttempts: 2,
+          sleepImpl: async () => undefined,
+        }),
+        (error: unknown) =>
+          error instanceof ModelProviderError &&
+          error.kind === "invalid-response" &&
+          /reasoning/i.test(error.message),
+      );
+      assert.equal(calls, 1);
+    },
+  );
+});
+
 
 test("DEEPSEEK_MODEL remains the fallback when no override is set", async () => {
   await withEnv(
@@ -119,6 +281,58 @@ test("DEEPSEEK_MODEL remains the fallback when no override is set", async () => 
       });
 
       assert.equal(requestedModel, "fallback/model");
+    },
+  );
+});
+
+test("a length-limited completion reports the output-token cause without retrying", async () => {
+  await withEnv(
+    {
+      DEEPSEEK_MODEL: "gemini-3.8-flash",
+      SCOPE_GUARD_MODEL: null,
+      DEEPSEEK_BASE_URL:
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+    },
+    async () => {
+      let calls = 0;
+      const fetcher: typeof fetch = async () => {
+        calls += 1;
+        return new Response(
+          JSON.stringify({
+            model: "gemini-3.8-flash",
+            choices: [
+              {
+                finish_reason: "length",
+                message: { content: '{"problemStatement":"truncated"' },
+              },
+            ],
+            usage: {
+              prompt_tokens: 100,
+              completion_tokens: 5000,
+              total_tokens: 5100,
+              completion_tokens_details: { reasoning_tokens: 4200 },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      };
+
+      await assert.rejects(
+        chatCompletion([{ role: "user", content: "hi" }], {
+          fetchImpl: fetcher,
+          timeoutMs: 5_000,
+          maxAttempts: 2,
+          maxTokens: 5000,
+          sleepImpl: async () => undefined,
+        }),
+        (error: unknown) =>
+          error instanceof ModelProviderError &&
+          error.kind === "invalid-response" &&
+          /finish_reason=length/.test(error.message) &&
+          /max_tokens=5000/.test(error.message) &&
+          /reasoning=4200/.test(error.message),
+      );
+      assert.equal(calls, 1);
     },
   );
 });
