@@ -1527,61 +1527,196 @@ function TrustSection() {
 /* Tech stack                                                                 */
 /* -------------------------------------------------------------------------- */
 
+type TechIconName =
+  | "next"
+  | "react"
+  | "typescript"
+  | "tailwind"
+  | "zod"
+  | "openrouter"
+  | "pdfmake"
+  | "node";
+
+function TechIcon({
+  name,
+  className = "h-5 w-5",
+}: {
+  name: TechIconName;
+  className?: string;
+}) {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    "aria-hidden": true,
+    className,
+  } as const;
+
+  switch (name) {
+    case "next":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="10" fill="currentColor" />
+          <path
+            d="M8 17V7h1.8l6.4 8.3V7H18v10h-1.8L9.8 8.8V17H8Z"
+            fill="#ffffff"
+          />
+        </svg>
+      );
+    case "react":
+      return (
+        <svg {...common} stroke="currentColor" strokeWidth="1.35">
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+          <ellipse cx="12" cy="12" rx="9" ry="3.8" />
+          <ellipse
+            cx="12"
+            cy="12"
+            rx="9"
+            ry="3.8"
+            transform="rotate(60 12 12)"
+          />
+          <ellipse
+            cx="12"
+            cy="12"
+            rx="9"
+            ry="3.8"
+            transform="rotate(120 12 12)"
+          />
+        </svg>
+      );
+    case "typescript":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="18" height="18" rx="3" fill="currentColor" />
+          <text
+            x="12"
+            y="15.8"
+            textAnchor="middle"
+            fill="#ffffff"
+            fontFamily="ui-monospace, monospace"
+            fontSize="7.5"
+            fontWeight="700"
+          >
+            TS
+          </text>
+        </svg>
+      );
+    case "tailwind":
+      return (
+        <svg {...common} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <path d="M3.5 11.5c2.4-4.7 5.2-5.4 7.6-2.2 1.4 1.9 2.8 2.5 5 .6" />
+          <path d="M8 17.5c2.4-4.7 5.2-5.4 7.6-2.2 1.4 1.9 2.8 2.5 5 .6" />
+        </svg>
+      );
+    case "zod":
+      return (
+        <svg {...common} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M6.5 5.5h11L6.5 18.5h11" />
+          <circle cx="19" cy="5.5" r="1.2" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "openrouter":
+      return (
+        <svg {...common} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="5.5" cy="6" r="2" />
+          <circle cx="18.5" cy="18" r="2" />
+          <path d="M7.5 6h3.7a4.3 4.3 0 0 1 4.3 4.3v.2a4.3 4.3 0 0 0 1.3 3.1l.5.5" />
+          <path d="m15.5 12.3 2.3-.2-.2 2.3" />
+        </svg>
+      );
+    case "pdfmake":
+      return (
+        <svg {...common} stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 3.5h7l4 4V20H6V3.5Z" />
+          <path d="M13 3.5V8h4M8.5 16.5h3M8.5 13.5h5" />
+          <text
+            x="8.6"
+            y="11.8"
+            fill="currentColor"
+            stroke="none"
+            fontFamily="ui-monospace, monospace"
+            fontSize="4.5"
+            fontWeight="700"
+          >
+            PDF
+          </text>
+        </svg>
+      );
+    case "node":
+      return (
+        <svg {...common} stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+          <path d="m12 3 8 4.6v8.8L12 21l-8-4.6V7.6L12 3Z" />
+          <text
+            x="12"
+            y="14.6"
+            textAnchor="middle"
+            fill="currentColor"
+            stroke="none"
+            fontFamily="ui-monospace, monospace"
+            fontSize="5.5"
+            fontWeight="700"
+          >
+            JS
+          </text>
+        </svg>
+      );
+  }
+}
+
 const TECH = [
   {
-    mark: "N",
+    icon: "next" as const,
     name: "Next.js",
     role: "App Router framework, server routes, and page rendering.",
-    tone: "bg-navy text-white",
+    tone: "bg-white text-navy",
     accent: "border-navy/10 bg-white",
   },
   {
-    mark: "R",
+    icon: "react" as const,
     name: "React",
     role: "Interactive workspace, editing, review, and export flows.",
-    tone: "bg-sky text-sky-800",
+    tone: "bg-sky/70 text-sky-700",
     accent: "border-sky-200/70 bg-white",
   },
   {
-    mark: "TS",
+    icon: "typescript" as const,
     name: "TypeScript",
     role: "Type-safe analysis, reconciliation, and UI logic.",
-    tone: "bg-[#e7f0ff] text-[#2f6fbb]",
+    tone: "bg-[#3178c6] text-white",
     accent: "border-sky-200/60 bg-white",
   },
   {
-    mark: "TW",
+    icon: "tailwind" as const,
     name: "Tailwind CSS",
     role: "Responsive layouts, visual system, and interaction states.",
-    tone: "bg-[#e8f7fb] text-[#0d7f9d]",
+    tone: "bg-[#e8f7fb] text-[#0284c7]",
     accent: "border-cyan-200/60 bg-white",
   },
   {
-    mark: "Z",
+    icon: "zod" as const,
     name: "Zod",
     role: "Runtime validation for structured scope and findings.",
     tone: "bg-lav text-brand",
     accent: "border-brand/10 bg-white",
   },
   {
-    mark: "OR",
+    icon: "openrouter" as const,
     name: "OpenRouter",
     role: "Model API access through an OpenAI-compatible client.",
     tone: "bg-peach text-[#9a5635]",
     accent: "border-amber-200/60 bg-white",
   },
   {
-    mark: "PDF",
+    icon: "pdfmake" as const,
     name: "pdfmake",
     role: "Client-side generation of review-ready scope reports.",
     tone: "bg-mint text-emerald-700",
     accent: "border-emerald-200/60 bg-white",
   },
   {
-    mark: "T",
+    icon: "node" as const,
     name: "Node test runner",
     role: "Deterministic regression tests via tsx and node:test.",
-    tone: "bg-[#eef1f5] text-[#4a5568]",
+    tone: "bg-[#eef7e7] text-[#4b8b3b]",
     accent: "border-slate-200 bg-white",
   },
 ];
@@ -1589,18 +1724,22 @@ const TECH = [
 function TechCard({ tech }: { tech: (typeof TECH)[number] }) {
   return (
     <article
-      className={`group h-full rounded-2xl border p-4 shadow-[0_14px_40px_-34px_rgba(23,32,51,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_48px_-34px_rgba(23,32,51,0.35)] motion-reduce:transform-none ${tech.accent}`}
+      className={`group h-full rounded-2xl border p-5 shadow-[0_14px_40px_-34px_rgba(23,32,51,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_48px_-34px_rgba(23,32,51,0.35)] motion-reduce:transform-none ${tech.accent}`}
     >
       <div className="flex items-center justify-between gap-2">
         <span
-          className={`flex h-9 min-w-9 items-center justify-center rounded-xl px-2 font-mono text-[10px] font-bold tracking-[-0.04em] ${tech.tone}`}
+          className={`flex h-11 w-11 items-center justify-center rounded-xl ${tech.tone}`}
         >
-          {tech.mark}
+          <TechIcon name={tech.icon} className="h-6 w-6" />
         </span>
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
       </div>
-      <h3 className="mt-3.5 text-[13px] font-semibold text-navy">{tech.name}</h3>
-      <p className="mt-1.5 text-[10.5px] leading-5 text-slatebody">{tech.role}</p>
+      <h3 className="mt-4 text-[15.5px] font-semibold tracking-[-0.01em] text-navy">
+        {tech.name}
+      </h3>
+      <p className="mt-2 text-[12.5px] leading-[1.65] text-slatebody">
+        {tech.role}
+      </p>
     </article>
   );
 }
@@ -1613,26 +1752,12 @@ function TechSection() {
     >
       <div className="mx-auto w-full max-w-[1220px] px-5 sm:px-8">
         <Reveal variant="blur">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.6fr)] lg:items-end">
-            <SectionIntro
-              number="07"
-              eyebrow="Under the hood"
-              title="Built with a modern web stack."
-              description="A focused implementation combining a modern web interface, schema validation, and AI-powered scope analysis."
-            />
-            <div className="rounded-2xl border border-navy/8 bg-white/70 p-4">
-              <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-slatebody">
-                Verified in this repository
-              </p>
-              <p className="mt-1.5 text-[11px] leading-5 text-navy/70">
-                Stack claims below come from{" "}
-                <code className="rounded bg-cream px-1 py-0.5 font-mono text-[10px] text-navy/80">
-                  package.json
-                </code>{" "}
-                and the current implementation — no imagined infrastructure.
-              </p>
-            </div>
-          </div>
+          <SectionIntro
+            number="07"
+            eyebrow="Under the hood"
+            title="Built with a modern web stack."
+            description="A focused implementation combining a modern web interface, schema validation, and AI-powered scope analysis."
+          />
         </Reveal>
 
         <div className="mt-9 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">

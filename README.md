@@ -24,6 +24,25 @@ The product is built for the OpenFire Hackathon, but the pipeline is designed as
 
 Scope Guard does not act as an autonomous project manager, estimation platform, contract generator, or a guarantee that scope creep cannot happen. It helps teams see what is supported, what is uncertain, and what still needs a decision.
 
+## How Scope Guard Processes a Brief
+
+| Stage | Executed by | What happens | What protects the result |
+|---|---|---|---|
+| 1. Source intake | Deterministic UI | Paste, record, or upload source material into one editable transcript field. | The original transcript is never rewritten. Transcription never starts analysis automatically. |
+| 2. Structured generation | Model + deterministic checks | Generate problem statement, scope sections, requirements, and acceptance criteria with statuses. | Zod shape validation, verbatim quote repair, unsupported-commitment downgrade, and tentative-language checks. |
+| 3. Independent review | Model + deterministic checks | Critique the status-labelled scope against the source for ambiguity, contradictions, missing information, and unsupported assumptions. | Findings require a verbatim source snippet. Fabricated evidence is dropped, duplicate evidence is collapsed, and proposal/status misstatements are filtered. |
+| 4. Conditional reconciliation | Model + deterministic checks | Only when the review contains a contradiction or unsupported assumption: repair the scope, revalidate it, and re-review it. | One bounded repair pass, a second evidence check, and fail-closed confirmed-conflict detection. |
+| 5. Clarification | Model + deterministic checks | Record a client answer, regenerate the scope, re-run review, and compare before/after results. | Unconfirmed notes never promote commitments. A proposal cannot become confirmed without a client-confirmed quote. |
+| 6. Reporting | Deterministic | Build distinct-decision counts, PDF preflight, and a client-shareable PDF. | Counts dedupe repeated representations, unresolved questions remain visible, and export actions preserve the current state. |
+
+A normal analysis uses **two model calls**. A reconciliation pass adds two more only when a conflict-type finding warrants repair. Every model call uses one absolute pipeline deadline; no stage or retry resets the full budget.
+
+## Hackathon Attribution
+
+**Built with Alan AI · Created for OpenFire Hackathon 2026**
+
+The attribution also appears at the bottom of the landing page.
+
 ## Product Surfaces
 
 | Route | Purpose |
@@ -219,6 +238,28 @@ OPENROUTER_TRANSCRIPTION_MODEL=openai/gpt-transcribe
 `DEEPSEEK_MODEL` is the required fallback analysis model. `SCOPE_GUARD_MODEL` optionally overrides it without editing source code — set it to a faster OpenRouter-compatible model id when analysis latency is a problem. `OPENROUTER_TRANSCRIPTION_MODEL` is used only for audio transcription and defaults to `openai/gpt-transcribe` in the adapter.
 
 The provider client retries transient failures within the call and pipeline budgets. A per-attempt timeout is never retried, because retrying a timeout makes the total request slower. The overall pipeline budget remains the hard limit even when retries are available.
+
+### Model selection
+
+The analysis model must support OpenAI-compatible chat completions, `response_format` with strict JSON schema, `max_tokens`, and optional reasoning that can be disabled. OpenRouter determines structured-output support per endpoint, not just per model.
+
+At the time of the model review, the recommended paid pairing was:
+
+| Role | Model | Reason |
+|---|---|---|
+| Primary | `openai/gpt-5.6-luna` | All 7 endpoints advertised structured outputs; roughly 1.05M context; fast/cost-efficient model positioning; about $0.20/M input and $1.20/M output. |
+| Fallback | `google/gemini-3.1-flash-lite` | All 8 endpoints advertised structured outputs; low-latency/high-volume positioning; about $0.25/M input and $1.50/M output. |
+
+Recommended production configuration:
+
+```ini
+SCOPE_GUARD_MODEL=openai/gpt-5.6-luna
+DEEPSEEK_MODEL=google/gemini-3.1-flash-lite
+```
+
+`SCOPE_GUARD_MODEL` is the active override. `DEEPSEEK_MODEL` is a configuration fallback used only when the override is unset — it is not automatic runtime failover. To use the fallback, set it as the override or remove `SCOPE_GUARD_MODEL` and restart.
+
+Paid models avoid the free-model request cap (20 requests/minute; 50/day below $10 in credits, 1,000/day above). Free preview models are useful for development but are not recommended for a judged live demo. Model IDs, endpoint support, and prices can change; verify them against the current OpenRouter catalogue before deploying.
 
 Never commit `.env.local`. It is ignored.
 
