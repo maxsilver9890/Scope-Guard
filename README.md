@@ -1,140 +1,209 @@
 # Scope Guard
 
-**Turn ambiguous client conversations into traceable, execution-ready scope — before the team starts building.**
+**Catch scope creep before it becomes costly rework.**
 
-Scope Guard is an AI-assisted scoping and requirements-verification workspace. It converts a messy discovery-call transcript or rough brief into a structured scope document, separates client-confirmed commitments from inferences and proposals, and then runs a separate critique pass to surface ambiguity, contradictions, missing information, and unsupported assumptions.
+Scope Guard turns messy discovery conversations into clear, evidence-backed project scopes — with assumptions, contradictions, and unanswered questions surfaced before development begins.
 
-The core idea is simple: a generic summarizer makes an unresolved question look like a decision. Scope Guard keeps the question visible.
+The product is built for the OpenFire Hackathon, but the pipeline is designed as a real working tool rather than a static demo. A model generates a structured scope, a separate review pass critiques it against the original source, and deterministic checks keep uncertainty visible instead of presenting it as agreement.
 
-## What It Does
+## What Scope Guard Does
 
-- Extracts a structured scope from raw text.
-- Labels every scope item with a commitment status:
-  - **Confirmed** — stated in the source.
+- Converts a discovery transcript, meeting notes, or rough project brief into a structured scope document.
+- Separates four commitment states:
+  - **Confirmed** — directly supported by a source quotation.
   - **Inferred** — a reasonable interpretation with a stated rationale.
-  - **Proposed** — a recommendation that still needs client approval.
+  - **Proposed** — an option or recommendation that still needs client approval.
   - **Unresolved** — an open decision or dependency.
 - Verifies quoted evidence against the original transcript and recorded client clarifications.
-- Renders the scope as a typeset project document rather than raw JSON.
-- Runs a second Scope Guard review that returns consequential findings with type, description, downstream impact, and a verbatim source quote.
-- Lets users edit the document without another model call.
-- Exports the current document and findings as Markdown.
-- Lets users resolve one open question with a client answer, regenerate the scope, re-run the critique, and inspect an actual before/after comparison.
+- Runs an independent Scope Guard review for ambiguity, contradictions, missing information, and unsupported assumptions.
+- Reconciles review findings back into the scope without weakening provenance or promotion safeguards.
+- Records client clarifications separately from the transcript. A tentative answer remains a note; it does not become a confirmed commitment.
+- Produces a deterministic comparison when a clarification changes the analysis.
+- Exports a structured PDF report with commitments, findings, evidence, clarifications, open questions, and change details.
+- Accepts audio recordings through browser recording or file upload, then transcribes them into the same editable source field.
 
-## Implemented Features
+Scope Guard does not act as an autonomous project manager, estimation platform, contract generator, or a guarantee that scope creep cannot happen. It helps teams see what is supported, what is uncertain, and what still needs a decision.
 
-### Two-pass analysis
+## Product Surfaces
 
-1. **Generation** — `generateScope()` asks the model for a schema-shaped scope document.
-2. **Critique** — `critiqueScope()` receives the source material and status-labelled scope, then returns findings classified as `ambiguity`, `contradiction`, `missing-info`, or `unsupported-assumption`.
+| Route | Purpose |
+|---|---|
+| `/` | Marketing landing page with product narrative, kinetic motion, and an interactive pipeline comparison. |
+| `/workspace` | The working Scope Guard application: source intake, analysis, review, clarifications, comparison, and PDF export. |
+| `POST /api/analyze` | Runs generation, critique, and reconciliation for a source brief. |
+| `POST /api/resolve` | Applies a clarification, regenerates the scope, re-runs review and reconciliation, and returns a comparison. |
+| `POST /api/transcribe` | Transcribes recorded or uploaded audio on the server. |
+| `GET /api/hello` | Provider connectivity diagnostic. |
 
-The two calls are deliberately independent. The critique is not a summary of the generator; it reviews the generated document against the source.
+The landing page calls to action point to `/workspace`; the GitHub button points to the repository.
 
-### Commitment and provenance integrity
+## Core Capabilities
 
-- Zod validates both raw model output and the repaired document.
-- Every confirmed or inferred item is checked against a verbatim quote.
-- Unsupported confirmed/inferred items are downgraded to proposals instead of being presented as client agreement.
-- Tentative language ("let's say yes for now", "if it's easy", "I think") cannot become a confirmed commitment.
-- Cherry-picked quotes are checked against caveats in the same client turn.
-- Invented cadence, numeric thresholds, export formats, and security guarantees are caught and downgraded.
-- Findings with unverifiable snippets are dropped; duplicate evidence is collapsed.
-- A previously provisional requirement cannot become confirmed during clarification unless the quote is supported by a client-confirmed clarification.
+### Evidence-backed scope generation
 
-### Editable document and export
+`generateScope()` requests a schema-shaped scope document, then `repairScopeProvenance()` checks quoted support. Unsupported confirmed or inferred items are downgraded to proposals instead of being presented as client agreement. Valid quotes are retained so a supported proposal remains distinguishable from an invented one.
 
-- Inline editing for the problem statement and every scope item.
-- Commitment statuses are read-only, so editing text cannot silently turn a proposal into an agreement.
-- The results view marks the document as edited after analysis.
-- Markdown export includes the current edited document, commitment statuses, client clarifications, and the current findings with source evidence.
+### Commitment-status model
 
-### Question resolution
+Status is part of the document contract, not a cosmetic label. A proposal or inference cannot silently become confirmed during regeneration. Promotion requires a quotation from a client-confirmed clarification.
 
-- Each open question has a **Resolve question** action.
-- The user records the client's answer and marks whether the client actually confirmed it.
-- Unconfirmed answers are stored as notes and cannot create confirmed commitments.
-- Regeneration runs the real generation and critique passes again.
-- A deterministic comparison shows changed, added, and removed scope items, plus findings that were resolved, retained, reworded, newly discovered, or could not be confidently matched.
-- If the document has manual edits, the UI requires explicit acknowledgement before regeneration replaces them.
+### Independent review and reconciliation
 
-## Architecture
+`critiqueScope()` reviews the status-labelled scope against the source material. Findings must include a verbatim source snippet; fabricated evidence is rejected and duplicate evidence is collapsed.
+
+`reconcileCritique()` performs one bounded repair pass:
+- the critique is sent back through generation;
+- the returned scope is repaired and validated again;
+- the scope is re-reviewed;
+- unresolved contradictions between confirmed commitments and reliable source evidence fail closed, preserving the previous valid results.
+
+### Clarifications and change tracking
+
+Users resolve one open question at a time by recording the client's answer and marking whether the client actually confirmed it.
+
+- Unconfirmed answers are stored as notes.
+- Unconfirmed notes cannot promote proposed or unresolved commitments.
+- A confirmed answer can update the scope only when its evidence supports the change.
+- Manual edits require explicit acknowledgement before regeneration replaces them.
+- `compareScopes()` reports added, removed, changed, and section-moved scope items, plus resolved, retained, reworded, new, and not-re-reported findings.
+- A proposed item that remains proposed does not count as a resolved finding.
+
+### Reporting and PDF export
+
+PDF export builds a paginated, client-shareable report in the browser with `pdfmake`. It includes the current edited scope, status labels, evidence quotations, findings, clarifications, and available change history.
+
+The preflight warning uses the actual unresolved-question count. It offers two actions:
+- **Review questions** navigates to the first unresolved question.
+- **Download draft** exports the current scope with unresolved items still visibly marked.
+
+The executive summary counts distinct decisions rather than duplicate section entries. Identical representations across Requirements and Acceptance Criteria count once, while genuinely distinct commitments and different statuses stay separate.
+
+### Audio intake
+
+The source panel offers three modes:
+
+- **Paste** — paste a transcript, meeting notes, or brief.
+- **Record** — record a conversation in the browser and transcribe it.
+- **Upload** — upload an existing audio file and transcribe it.
+
+Transcription never starts analysis automatically. When transcription succeeds, an empty source field is populated. If the field already contains text, the user chooses Replace, Append, or Cancel. Failures and cancellation preserve the existing source text.
+
+### Landing experience
+
+The landing page at `/` presents the product narrative through:
+- an animated kinetic hero;
+- problem and solution sections;
+- a three-step workflow;
+- a six-feature product showcase;
+- a trust/evidence comparison;
+- verified technology cards;
+- an interactive two-pipeline demonstration contrasting an unvalidated brief with a Scope Guard-assisted workflow.
+
+Motion respects `prefers-reduced-motion`, and the page degrades to readable final states when animation is unavailable.
+
+## Analysis Pipeline
 
 ```text
-Browser
-  └─ ScopeWorkspace (client component)
-       ├─ POST /api/analyze
-       │    └─ generateScope
-       │         ├─ rawScopeSchema validation
-       │         ├─ repairScopeProvenance (deterministic)
-       │         └─ scopeSchema validation
-       │    └─ critiqueScope
-       │         ├─ strict JSON-schema findings response
-       │         ├─ salvage malformed findings
-       │         ├─ enforceFindingProvenance
-       │         └─ return { scope, findings }
-       │
-       └─ POST /api/resolve
-            └─ resolveScope
-                 ├─ validate request and selected question
-                 ├─ generateScope with transcript + clarification + current document
-                 ├─ repairScopeProvenance against both sources
-                 ├─ block unsupported promotions to confirmed
-                 ├─ critiqueScope against both sources
-                 ├─ enforceFindingProvenance
-                 └─ compareScopes → { scope, findings, comparison }
+Source transcript / brief
+          │
+          ▼
+   generateScope()
+          │
+          ├── rawScopeSchema validation
+          ├── repairScopeProvenance()
+          └── scopeSchema validation
+          │
+          ▼
+    critiqueScope()
+          │
+          ├── findings schema validation
+          ├── enforceFindingProvenance()
+          └── scope-consistency finding filter
+          │
+          ▼
+  reconcileCritique()
+          │
+          ├── one generation repair pass
+          ├── provenance repair
+          ├── re-review
+          └── confirmed-conflict guard
+          │
+          ▼
+  Scope + findings returned to the workspace
 ```
 
-The original transcript is never rewritten. Clarifications are stored separately on the scope as `{ id, question, answer, confirmed }`. Scope items and findings record `sourceKind` (`transcript` or `clarification`) and, when applicable, `clarificationId`.
+When a clarification is applied, `resolveScope()` additionally:
+- validates the selected open question;
+- preserves unrelated confirmed commitments;
+- blocks unsupported promotions to confirmed;
+- preserves the latest clarification history;
+- computes the deterministic before/after comparison.
 
-### Key files
-
-| Path | Responsibility |
-|---|---|
-| `src/app/page.tsx` | Server entry point; reads the sample transcript, renders the header and workspace |
-| `src/components/scope-workspace.tsx` | Intake, results, status display, editing, question resolution, comparison, export |
-| `src/app/api/analyze/route.ts` | `POST /api/analyze` → `{ scope, findings }` |
-| `src/app/api/resolve/route.ts` | `POST /api/resolve` → `{ scope, findings, comparison }` |
-| `src/lib/generate.ts` | Generation prompt, clarification context, validation and repair |
-| `src/lib/critique.ts` | Critique prompt, strict findings schema, evidence enforcement |
-| `src/lib/schema.ts` | Zod schemas, commitment statuses, clarification and finding types |
-| `src/lib/provenance.ts` | Quote verification, source attribution, downgrade rules |
-| `src/lib/resolve.ts` | Clarification orchestration, promotion guard, injectable model calls |
-| `src/lib/diff.ts` | Deterministic scope and finding comparison |
-| `src/lib/markdown.ts` | Markdown export and escaping |
-| `src/lib/deepseek.ts` | OpenAI-compatible chat-completions client, timeout, retries, JSON schema support |
-| `tests/` | Unit and route tests |
+The original transcript is never rewritten. Clarifications are stored separately as `{ id, question, answer, confirmed }`. Scope items and findings record `sourceKind` (`transcript` or `clarification`) and, where applicable, `clarificationId`.
 
 ## Tech Stack
 
-- **Next.js 16.4.3** (App Router, Turbopack, Cache Components)
-- **React 19.3**
-- **TypeScript 5**
-- **Tailwind CSS 4** (CSS-first configuration in `src/app/globals.css`; no `tailwind.config.ts`)
-- **Zod 4** for structured output validation
-- **OpenRouter** through an OpenAI-compatible chat-completions endpoint
-- **Node's test runner via `tsx`** for focused TypeScript tests
-- No UI component, icon, charting, or rich-text libraries
+- **Next.js 16.4.3** — App Router, server routes, static landing page.
+- **React 19.3** — interactive workspace and landing-page motion components.
+- **TypeScript 5** — type-safe application, analysis, and test code.
+- **Tailwind CSS 4** — responsive layout and visual system.
+- **Zod 4** — runtime validation for scope, clarification, and finding contracts.
+- **OpenRouter** — model API access through an OpenAI-compatible chat-completions client.
+- **pdfmake 0.3.13** — client-side PDF report generation.
+- **Next.js Font Optimization** — Geist for UI text and Fraunces for editorial display type.
+- **Node test runner + `tsx`** — deterministic unit, route, pipeline, and regression tests.
 
-## Setup
+No UI component library, charting library, or rich-text editor is used. The landing-page illustration and product mockups are built from CSS, SVG, and representative product data.
+
+## Project Structure
+
+| Path | Responsibility |
+|---|---|
+| `src/app/page.tsx` | Landing page entry point and metadata. |
+| `src/app/workspace/page.tsx` | Working application route. |
+| `src/components/landing/` | Landing page composition, navigation, motion, icons, and pipeline comparison. |
+| `src/components/scope-workspace.tsx` | Source intake, results, editing, review, clarifications, comparison, PDF preflight, and export. |
+| `src/components/scope-input.tsx` | Three source modes, transcription handoff, source status, and analysis action. |
+| `src/components/scope-nav.tsx` | Workspace section navigation. |
+| `src/app/api/analyze/route.ts` | Generation, critique, reconciliation, and validated analysis response. |
+| `src/app/api/resolve/route.ts` | Clarification application and comparison response. |
+| `src/app/api/transcribe/route.ts` | Audio upload validation and server-side transcription. |
+| `src/lib/generate.ts` | Generation prompt, clarification context, schema validation, and provenance repair. |
+| `src/lib/critique.ts` | Critique prompt, findings schema, evidence enforcement, and consistency filtering. |
+| `src/lib/provenance.ts` | Quote verification, source attribution, downgrade rules, and finding/scope consistency checks. |
+| `src/lib/reconcile.ts` | Bounded repair pass and confirmed-conflict guard. |
+| `src/lib/resolve.ts` | Clarification orchestration, promotion guard, and comparison orchestration. |
+| `src/lib/diff.ts` | Deterministic scope/finding comparison and change classification. |
+| `src/lib/commitments.ts` | Distinct-decision aggregation for executive counts. |
+| `src/lib/clarifications.ts` | Unresolved-question preflight and PDF action routing. |
+| `src/lib/pdf-export.ts` | PDF document definition and client download. |
+| `src/lib/schema.ts` | Zod schemas, statuses, clarifications, and findings. |
+| `src/lib/deepseek.ts` | OpenAI-compatible provider client, timeout, retries, and structured output support. |
+| `src/lib/analysis-state.ts` | Atomic result state, analysis labels, and loading guidance. |
+| `tests/` | Unit, route, pipeline, provenance, comparison, and PDF tests. |
+
+## Getting Started
 
 Requirements: Node.js 20+ (Node 24 recommended), npm.
 
 ```powershell
-cd "C:\Users\saxen\Downloads\Scope Guard"
 npm install
 Copy-Item .env.example .env.local
 ```
 
-Fill in the provider key in `.env.local`. The included example targets OpenRouter:
+Fill in the provider key in `.env.local`. The current example targets OpenRouter:
 
 ```ini
 DEEPSEEK_API_KEY=<your OpenRouter key>
 DEEPSEEK_BASE_URL=https://openrouter.ai/api/v1
 DEEPSEEK_MODEL=dots-studio/dots-3-note-preview:free
+OPENROUTER_TRANSCRIPTION_MODEL=openai/gpt-transcribe
 DEEPSEEK_TIMEOUT_MS=75000
 ```
 
-`DEEPSEEK_MODEL` is required and is the single model configuration point. Do not commit `.env.local`; it is ignored.
+`DEEPSEEK_MODEL` is required and is the single analysis-model configuration point. `OPENROUTER_TRANSCRIPTION_MODEL` is used only for audio transcription and defaults to `openai/gpt-transcribe` in the adapter.
+
+Never commit `.env.local`. It is ignored.
 
 Start the app:
 
@@ -142,58 +211,43 @@ Start the app:
 npm run dev
 ```
 
-Open <http://localhost:3000>. Restart the dev server after editing `.env.local`, because environment files are read at startup.
+Open <http://localhost:3000> for the landing page and <http://localhost:3000/workspace> for the analysis workspace. Restart the dev server after changing `.env.local`.
 
-## Testing
+## Verification
+
+Run:
 
 ```powershell
 npm test
 npx tsc --noEmit
-npm run lint
+npx eslint src tests
 npm run build
+git diff --check
 ```
 
 Current state:
 
-- **57 tests pass.**
-- Typecheck and ESLint pass.
-- `next build` succeeds; `/` is prerendered and the three API routes are dynamic.
+- **167 tests pass.**
+- TypeScript and ESLint pass.
+- The production build succeeds.
+- `/` and `/workspace` are prerendered; API routes remain dynamic.
 
-The tests cover:
+The suite covers commitment status and provenance, supported proposals, tentative language, clarification states, promotion guards, deterministic diffs, finding resolution, distinct-decision counts, PDF preflight actions, PDF content, source-text handoff, transcription routes, analysis state, and API error mapping.
 
-- Commitment-status and provenance rules.
-- Transcript versus clarification quote attribution.
-- Confirmed versus unconfirmed clarification behavior.
-- Blocking unrelated promotions to confirmed.
-- Original transcript preservation.
-- Scope diffs (status changes, additions, removals, problem statement).
-- Findings resolved, retained, reworded, newly discovered, and unmatched.
-- Failure propagation without mutating the request.
-- Resolve-route validation: malformed JSON, empty answer, empty transcript, and a question that is not open.
-- Markdown export, escaping, clarifications, and current-document consistency.
-
-### Live-model verification status
-
-The earlier analysis pipeline completed live runs against OpenRouter. **Final Phase 5 question-resolution verification was blocked by OpenRouter's free-model daily rate limit (`429 free-models-per-day`).** The resolve orchestration, promotion rules, diffs, and API validation are therefore verified with injected mock generators and route tests, not a completed live resolve. Once quota resets or credits are added, the browser workflow below is the intended end-to-end check.
+Browser-based end-to-end interaction tests are not automated. Responsive layout, recording permissions, file uploads, and download behavior should be checked manually against the deployment environment.
 
 ## Demo Workflow
 
-1. The app opens with the Northwind Interiors discovery transcript prefilled from `samples/discovery-call-transcript.txt`.
-2. Click **Analyze**.
-3. Review the generated Project Scope. Confirmed, inferred, proposed, and unresolved items are visibly separated.
-4. Review **Potential delivery risks** and each finding's source evidence.
-5. In **Open Questions**, click **Resolve question**.
-6. Record the client's answer.
-   - Leave **The client confirmed this answer** unchecked to store an unconfirmed note.
-   - Check it only if the client actually confirmed the answer.
-7. Click **Apply clarification**. The API regenerates the scope and reruns the critique.
-8. Review **What changed**:
-   - the recorded question and answer;
-   - whether the question is still open;
-   - added, removed, and changed scope items;
-   - resolved, retained, reworded, new, and unmatched findings.
-9. Optionally edit the document. Status badges remain unchanged.
-10. Click **Export Markdown** to download the current document and findings.
+1. Open `/` and review the product narrative and pipeline comparison.
+2. Select **Try Scope Guard** to enter `/workspace`.
+3. The workspace starts with the Northwind Interiors discovery transcript from `samples/discovery-call-transcript.txt`.
+4. Select **Analyze**. After results exist, the action becomes **Re-analyze**.
+5. Review the scope, the status legend, and **Scope Guard Review** findings with their source evidence.
+6. Open **Open Questions** and choose **Resolve question**.
+7. Record the client's answer and mark whether it was actually confirmed.
+8. Apply the clarification. Confirm that the scope, findings, clarification state, and **What changed** comparison remain consistent.
+9. Optionally edit the document. Status labels remain read-only.
+10. Select **Download PDF**. If unresolved questions remain, review the preflight warning or download the draft with unresolved items still identified.
 
 ## API Contracts
 
@@ -214,7 +268,16 @@ Returns:
 ```json
 {
   "input": "original transcript",
-  "scope": { "problemStatement": "...", "inScope": [], "outOfScope": [], "assumptions": [], "openQuestions": [], "requirements": [], "acceptanceCriteria": [], "clarifications": [] },
+  "scope": {
+    "problemStatement": "...",
+    "inScope": [],
+    "outOfScope": [],
+    "assumptions": [],
+    "openQuestions": [],
+    "requirements": [],
+    "acceptanceCriteria": [],
+    "clarifications": []
+  },
   "findings": [],
   "question": "selected open question",
   "answer": "client answer",
@@ -226,103 +289,60 @@ Returns:
 Returns:
 
 ```json
-{ "scope": { "...": "..." }, "findings": [], "comparison": { "items": [], "findings": {}, "questionResolved": true, "clarification": {}, "summary": [] } }
+{
+  "scope": { "...": "..." },
+  "findings": [],
+  "comparison": {
+    "items": [],
+    "findings": {},
+    "questionResolved": true,
+    "clarification": {},
+    "summary": []
+  }
+}
 ```
 
-Invalid requests return `400` with a concise error. Provider failures return `500` with a controlled message; the client preserves the current document and findings.
+Invalid requests return `400` with a concise error. Reconciliation failures return `422` when the generated scope cannot be validated or a confirmed decision still conflicts with reliable evidence. Provider failures return controlled `5xx` messages; the client preserves the current document and findings.
 
-## Integrity Rules
+## Integrity and Safety Rules
 
 - No fabricated quotes: evidence must appear verbatim in the transcript or a recorded clarification.
-- No fabricated diffs: comparisons are computed from before/after data, not by the model.
-- No fabricated success: the API returns an updated scope only after generation, provenance checks, and critique complete.
-- No silent promotion: a proposed or inferred item cannot become confirmed without a client-confirmed clarification.
-- No hidden reprocessing: the critique always runs after generation; it is never skipped.
-- No logging of API keys, full transcripts, or raw reasoning. Diagnostics are limited to model, finish reason, token counts, and counts of dropped or downgraded items.
+- No silent promotion: proposed and inferred items cannot become confirmed without a client-confirmed clarification.
+- No automatic confirmation from a note: unconfirmed clarifications remain provisional.
+- No false resolution: a finding is not marked resolved merely because a feature moved or was reworded.
+- No hidden duplicates in executive counts: repeated representations of one decision count once, while distinct commitments remain separate.
+- No fabricated diffs: comparisons are computed from before/after data.
+- No skipped review: critique runs after generation, and reconciliation is bounded to one repair pass.
+- No rewriting the source: the original transcript is preserved exactly.
+- No destructive failure: failed analysis or reconciliation leaves the previous valid results and clarification data intact.
+- No secret logging: API keys, full transcripts, and raw reasoning are not logged. Diagnostics are limited to model metadata, finish reason, token counts, and counts of dropped or downgraded items.
 
 ## Known Limitations
 
-- **Free-tier quota:** OpenRouter's free-model daily limit currently blocks a completed live Phase 5 resolve. The app surfaces the rate-limit message and leaves the current results untouched.
-- **Model quality:** The configured free model is capable but not frontier. Deterministic guards enforce evidence and promotion rules; semantic classification quality still depends on the model.
-- **Promotion matching:** The promotion guard finds the previous item by exact or highly similar text. A heavily reworded promotion could bypass that match, though it still needs a verbatim quote from a confirmed source.
-- **One clarification at a time:** Multiple questions are resolved sequentially, not in a batch.
-- **Edited-document replacement:** Regeneration replaces manual edits after explicit UI acknowledgement; it does not merge edits field-by-field.
-- **No browser E2E suite:** The editing, resolution, and export flows are covered by unit tests, route tests, typecheck, and a successful production build, but not an automated browser click-through.
-- **v1 scope:** No authentication, organizations, persistent project history, live call capture, Jira/Linear integration, or collaborative editing.
+- Model quality still depends on the configured provider and model. Deterministic guards enforce evidence and promotion rules but cannot make semantic review perfect.
+- The free OpenRouter model can be rate-limited or unavailable. Failures preserve the current results but stop the requested analysis.
+- Promotion matching uses exact or highly similar wording. A heavily reworded promotion still requires a confirmed-source quotation but may not be matched to its previous item.
+- Clarifications are applied one at a time, not in a batch.
+- Regeneration replaces manual edits after explicit acknowledgement; it does not merge edits field by field.
+- PDF output is generated client-side and should be visually reviewed after dependency or layout changes.
+- No authentication, organizations, persistent project history, Jira/Linear integration, or collaborative editing.
+- No automated browser end-to-end suite covers recording, uploading, responsive navigation, or PDF download interaction.
 
 ## Sample Inputs
 
-- `samples/discovery-call-transcript.txt` — a messy Northwind Interiors discovery call.
-- `samples/vague-feature-request.txt` — a short, vague feature request.
+- `samples/discovery-call-transcript.txt` — messy Northwind Interiors discovery call.
+- `samples/northstar-dental-transcript.txt` — dental clinic brief with tentative decisions.
+- `samples/vague-feature-request.txt` — short, vague feature request.
 
-These are stable regression inputs for the analysis and critique passes.
+These are stable inputs for analysis and regression testing.
 
-## Source-input UX update — October 2026
+## Product Boundaries
 
-The source panel keeps **Paste Text**, **Record Conversation**, and **Upload Recording** as separate ways to enter source material, while all three use the same editable source-text field. Each mode explains how its input reaches that field. Users can also type or paste text while Record or Upload is selected; audio is optional when source text is already present.
+Scope Guard is a scoping and review aid. It does not:
+- make final project commitments on behalf of a client;
+- estimate cost or delivery effort;
+- generate contracts;
+- guarantee complete requirements or eliminate scope risk;
+- replace human review of a project brief.
 
-The field is labeled **FINAL SOURCE MATERIAL / TRANSCRIPT** and explains that this is the text Scope Guard analyzes. Users can edit a transcript or combine it with written context before analysis. Empty or whitespace-only text cannot be analyzed, and the interface explains what to add.
-
-Recording and uploaded audio use the existing transcription request. When transcription succeeds, an empty source field is populated automatically. If the field already contains text, Scope Guard asks the user to **Replace existing text**, **Append transcript**, or **Cancel**. Appending preserves the current text and inserts a blank line before the transcript. Canceling or a transcription failure leaves the source text unchanged. Transcription never starts scope analysis; the user must select **Analyze** after reviewing the source field.
-
-### Latest automated verification
-
-This snapshot supersedes the earlier test counts above: `npm test` reports **106 passing tests**. `npx tsc --noEmit`, `npx eslint src tests`, and `npm run build` also pass. The source-text tests cover empty-field transcription, protected existing text, replace/append/cancel, failure preservation, blank-text validation, and text changes made while transcription is running.
-
-Desktop and mobile browser inspection was not completed in the implementation environment. Responsive layout and the dialog still need a manual visual check.
-## Product Update — Audio Intake and PDF Export
-
-*Implementation update: October 2026. This addendum records the current product behavior; earlier feature summaries and verification counts above describe an earlier snapshot and are retained for history.*
-
-### Three ways to provide source material
-
-The source panel now offers three input modes:
-
-- **Paste Text** — paste a discovery transcript, meeting notes, or a rough project brief.
-- **Record Conversation** — grant microphone access, record in the browser, and stop to transcribe. The interface shows recording status and elapsed time, and provides Stop and Cancel controls.
-- **Upload Recording** — choose an existing audio file and transcribe it.
-
-Both audio modes put the returned transcript into the same editable source field used by Paste Text. Review and edit the transcript, then explicitly select **Analyze**. Audio does not use a separate scope-generation or critique pipeline: analysis still submits text to `POST /api/analyze` and runs the existing generation, validation, provenance, and critique steps.
-
-The recorder feature uses browser `MediaRecorder` and checks supported MIME types at runtime. Microphone access requires browser permission and a secure context (HTTPS; `localhost` is supported). Canceling a recording stops its microphone tracks. Transcription requests can be canceled; duplicate requests are blocked. If transcription fails, the current source text and displayed scope results remain available, and the selected recording can be retried.
-
-### Transcription, privacy, and limits
-
-Audio is submitted to the server-side `POST /api/transcribe` route and forwarded to OpenRouter's dedicated transcription endpoint with `openai/gpt-transcribe`. The existing OpenRouter API key stays on the server. The configured scope-analysis model is not changed; transcription uses the separate `OPENROUTER_TRANSCRIPTION_MODEL` setting.
-
-Supported upload extensions are MP3, M4A/MP4, WAV, WebM, OGG, FLAC, and AAC. The server enforces a 4 MiB audio-file limit and bounds the full multipart request before parsing. Recordings stop at 15 minutes and request a 32 kbps audio bitrate; browser encoders can vary, so the 4 MiB limit still applies. An oversized recording can be downloaded from the page so it can be shortened or compressed before retrying. Uploaded files have no separate decoded-duration limit: their size is capped, and the transcription request has a 55-second provider timeout.
-
-Recordings are held in browser memory until transcription is requested. Scope Guard does not write audio to persistent storage or log audio contents, full transcripts, or API keys. When transcription is requested, audio is sent over HTTPS to Scope Guard's server and then to OpenRouter and its selected model provider; provider data handling and retention terms may vary. The recording interface reminds users to obtain the other participants' knowledge and consent before recording.
-
-The deployment target is not declared in this repository. The 4 MiB file cap leaves headroom under Vercel Functions' documented 4.5 MB request-body limit, but the production host and plan should be checked before raising limits. Long-recording chunking and persistent audio storage are not implemented.
-
-OpenRouter currently lists GPT Transcribe at **$0.000075 per second ($0.0045 per minute)**. For example, a 15-minute transcription is approximately $0.0675 at that listed rate. Pricing can change; see the [current model listing](https://openrouter.ai/openai/gpt-transcribe). This transcription model is usage-priced; it is separate from the configured free analysis model.
-
-### Client-shareable PDF export
-
-The primary document export is **Download PDF**. It builds a paginated PDF from the current edited scope workspace, including commitment statuses, findings and source evidence, clarifications, and an available change comparison. The document includes a cover, a generated table of contents, section navigation, page numbers, and a restrained footer. Generation uses `pdfmake` in the client and does not send scope content to a PDF service. Markdown is no longer offered as a separate export action in the current UI.
-
-### Configuration
-
-Copy `.env.example` to `.env.local`, add the server-side OpenRouter key, and keep the OpenRouter base URL. Preserve the current analysis model. Set the transcription model separately:
-
-```ini
-DEEPSEEK_API_KEY=<your OpenRouter key>
-DEEPSEEK_BASE_URL=https://openrouter.ai/api/v1
-DEEPSEEK_MODEL=dots-studio/dots-3-note-preview:free
-OPENROUTER_TRANSCRIPTION_MODEL=openai/gpt-transcribe
-```
-
-`OPENROUTER_TRANSCRIPTION_MODEL` defaults to `openai/gpt-transcribe` in the server adapter if omitted. Never put the API key in client code or commit `.env.local`.
-
-### Current verification
-
-The current automated suite contains **83 passing tests**. `npm test`, `npx tsc --noEmit`, `npx eslint src tests`, and `npm run build` pass. Transcription route success, timeout, validation, and provider-error cases use mocked responses; no usage-billed live transcription request was made. Manual browser checks for microphone permissions, browser-specific recording formats, file uploads, and live OpenRouter transcription remain to be completed.
-
-### Snapshot clarification
-
-The original overview above is retained as requested and predates these updates. In particular, its **57 tests**, **Export Markdown**, and **no live call capture** statements are historical: the current suite has 83 tests, the current primary export is **Download PDF**, and the current app can record a conversation in the browser and transcribe it after Stop. It does not provide real-time transcription while a conversation is in progress.
-
-## Latest verification update — October 2026
-
-The source-input UX addendum above describes the current three-mode workflow. This snapshot supersedes the earlier test counts: `npm test` reports **106 passing tests**. `npx tsc --noEmit`, `npx eslint src tests`, and `npm run build` also passed for this implementation. Desktop and mobile browser inspection was not completed; manual responsive UI review remains outstanding.
+Its purpose is to expose ambiguity, preserve uncertainty, and help teams identify what needs clarification before implementation.
