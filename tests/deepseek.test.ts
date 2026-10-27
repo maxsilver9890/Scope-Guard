@@ -264,6 +264,86 @@ test("provider errors expose sanitized messages without prompt or key echoes", a
   );
 });
 
+test("Google nested 503 errors log the provider message and code safely", async () => {
+  await withEnv(
+    {
+      DEEPSEEK_MODEL: "gemini-3.8-flash",
+      SCOPE_GUARD_MODEL: null,
+      DEEPSEEK_BASE_URL:
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+    },
+    async () => {
+      const logs: string[] = [];
+      const originalWarn = console.warn;
+      const prompt = "Private bakery transcript";
+      console.warn = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+      try {
+        const fetcher: typeof fetch = async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                code: 503,
+                status: "UNAVAILABLE",
+                errors: [
+                  {
+                    reason: "backendError",
+                    message: `Temporary model overload while handling ${prompt}`,
+                  },
+                ],
+              },
+            }),
+            { status: 503 },
+          );
+
+        await assert.rejects(
+          chatCompletion([{ role: "user", content: prompt }], {
+            fetchImpl: fetcher,
+            maxAttempts: 1,
+          }),
+          (error: unknown) =>
+            error instanceof ModelProviderError &&
+            error.message.includes("Temporary model overload") &&
+            error.message.includes("[redacted]") &&
+            !error.message.includes(prompt),
+        );
+        const output = logs.join("\n");
+        assert.match(output, /code=503/);
+        assert.match(output, /Temporary model overload/);
+        assert.equal(output.includes(prompt), false);
+      } finally {
+        console.warn = originalWarn;
+      }
+    },
+  );
+});
+
+test("root-level provider message and code fields are parsed", async () => {
+  await withEnv({ DEEPSEEK_MODEL: "busy/model" }, async () => {
+    const logs: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+    try {
+      await assert.rejects(
+        chatCompletion([{ role: "user", content: "hi" }], {
+          fetchImpl: async () =>
+            new Response(
+              JSON.stringify({ message: "Gateway temporarily unavailable", code: 503 }),
+              { status: 503 },
+            ),
+          maxAttempts: 1,
+        }),
+        (error: unknown) =>
+          error instanceof ModelProviderError &&
+          error.message.includes("Gateway temporarily unavailable"),
+      );
+      assert.match(logs.join("\n"), /code=503/);
+      assert.match(logs.join("\n"), /Gateway temporarily unavailable/);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+});
+
 test("a reasoning-only completion fails as an invalid response without retrying", async () => {
   await withEnv(
     {
@@ -452,6 +532,88 @@ test("transient provider failures use the configured retry limit", async () => {
           error instanceof ModelProviderError && error.kind === "unavailable",
       );
       assert.equal(calls, 2);
+    },
+  );
+});
+
+test("Retry-After is honored when the deadline leaves time for another attempt", async () => {
+  await withEnv(
+    { DEEPSEEK_MODEL: "busy/model" },
+    async () => {
+      let calls = 0;
+      const delays: number[] = [];
+      const fetcher: typeof fetch = async () => {
+        calls += 1;
+        return calls === 1
+          ? new Response(JSON.stringify({ error: { code: 503, message: "busy" } }), {
+              status: 503,
+              headers: { "Retry-After": "2" },
+            })
+          : successResponse();
+      };
+
+      const result = await chatCompletion([{ role: "user", content: "hi" }], {
+        fetchImpl: fetcher,
+        deadline: Date.now() + 10_000,
+        maxAttempts: 2,
+        sleepImpl: async (ms) => { delays.push(ms); },
+      });
+      assert.equal(result.content, "ok");
+      assert.equal(calls, 2);
+      assert.deepEqual(delays, [2_000]);
+    },
+  );
+});
+
+test("Retry-After that leaves no retry budget prevents the retry", async () => {
+  await withEnv(
+    { DEEPSEEK_MODEL: "busy/model" },
+    async () => {
+      let calls = 0;
+      const fetcher: typeof fetch = async () => {
+        calls += 1;
+        return new Response(JSON.stringify({ error: { code: 503, message: "busy" } }), {
+          status: 503,
+          headers: { "Retry-After": "2" },
+        });
+      };
+
+      await assert.rejects(
+        chatCompletion([{ role: "user", content: "hi" }], {
+          fetchImpl: fetcher,
+          deadline: Date.now() + 2_500,
+          maxAttempts: 3,
+          sleepImpl: async () => undefined,
+        }),
+        (error: unknown) => error instanceof ModelProviderError && error.kind === "timeout",
+      );
+      assert.equal(calls, 1);
+    },
+  );
+});
+
+test("a non-retryable 4xx status is never retried for a transient-looking code", async () => {
+  await withEnv(
+    { DEEPSEEK_MODEL: "busy/model" },
+    async () => {
+      let calls = 0;
+      const fetcher: typeof fetch = async () => {
+        calls += 1;
+        return new Response(
+          JSON.stringify({ error: { code: "service_busy", message: "invalid request" } }),
+          { status: 400 },
+        );
+      };
+
+      await assert.rejects(
+        chatCompletion([{ role: "user", content: "hi" }], {
+          fetchImpl: fetcher,
+          maxAttempts: 3,
+          sleepImpl: async () => undefined,
+        }),
+        (error: unknown) => error instanceof ModelProviderError && error.kind === "request",
+      );
+      assert.equal(calls, 1);
     },
   );
 });

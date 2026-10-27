@@ -90,15 +90,13 @@ export type ChatCompletionOptions = {
   /** Injectable dependencies for deterministic tests. */
   fetchImpl?: typeof fetch;
   sleepImpl?: (ms: number) => Promise<void>;
+  randomImpl?: () => number;
 };
 
 type ProviderResponse = {
   model?: string;
-  error?: string | {
-    message?: string;
-    code?: string | number;
-    status?: string;
-  };
+  [key: string]: unknown;
+  error?: unknown;
   choices?: Array<{
     finish_reason?: string;
     message?: {
@@ -122,6 +120,8 @@ const RETRYABLE_CODES = new Set([
   "overloaded",
   "provider_overloaded",
 ]);
+const MAX_BACKOFF_MS = 8_000;
+const MIN_RETRY_ATTEMPT_MS = 1_000;
 
 function isOpenRouterEndpoint(baseUrl: string): boolean {
   try {
@@ -191,9 +191,34 @@ function timeoutMessage(model: string, timeoutMs: number): string {
   return `Model request exceeded ${timeoutMs}ms (model: ${model}). Retry once, or set SCOPE_GUARD_MODEL to a faster OpenRouter-compatible model.`;
 }
 
-function retryDelay(attempt: number, callDeadline: number): number | null {
-  const delay = 1000 * attempt * attempt;
-  return Date.now() + delay < callDeadline ? delay : null;
+function parseRetryAfter(value: string | null, now: number): number | null {
+  if (!value) return null;
+  const seconds = Number(value.trim());
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.ceil(seconds * 1000);
+  }
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - now) : null;
+}
+
+function retryDelay(
+  attempt: number,
+  callDeadline: number,
+  retryAfter: string | null,
+  random: () => number,
+  now = Date.now(),
+): number | null {
+  const remaining = callDeadline - now;
+  if (remaining <= MIN_RETRY_ATTEMPT_MS) return null;
+
+  const serverDelay = parseRetryAfter(retryAfter, now);
+  const exponential = Math.min(1000 * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+  const jitter = Math.min(
+    Math.floor(exponential * (0.5 + Math.min(Math.max(random(), 0), 1))),
+    MAX_BACKOFF_MS,
+  );
+  const delay = serverDelay ?? jitter;
+  return delay + MIN_RETRY_ATTEMPT_MS <= remaining ? delay : null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -220,26 +245,84 @@ function describeProviderError(
   messages: ChatMessage[],
   apiKey: string,
 ): string {
-  const providerError = parsed?.error;
-  const message =
-    typeof providerError === "string" ? providerError : providerError?.message;
-  const code = typeof providerError === "object" ? providerError?.code : undefined;
+  const { message, code } = extractProviderError(parsed);
 
   if (typeof message === "string" && message.trim()) {
     let sanitized = message;
     for (const secret of [apiKey, ...messages.map(({ content }) => content)]) {
       if (secret) sanitized = sanitized.replaceAll(secret, "[redacted]");
     }
+    sanitized = sanitized
+      .replace(/\bBearer\s+[^\s,"'}]+/gi, "Bearer [redacted]")
+      .replace(/\bAIza[0-9A-Za-z_-]{20,}\b/g, "[redacted]")
+      .replace(/\bya29\.[0-9A-Za-z._-]+/g, "[redacted]")
+      .replace(/((?:api[_-]?key|access[_-]?token)["']?\s*[:=]\s*["']?)[^,;\s"'}]+/gi, "$1[redacted]");
     const summary = truncate(sanitized, 200);
-    return code ? `${summary} (code: ${String(code)})` : summary;
+    return code ? `${summary} (code: ${sanitizeProviderCode(code)})` : summary;
   }
 
   // Never log an unstructured provider body: it can echo request content.
   return `no structured provider error (${raw.length} body chars)`;
 }
 
+function sanitizeProviderCode(code?: string | number): string {
+  if (code === undefined) return "none";
+  return String(code).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80) || "unknown";
+}
+
+function extractProviderError(parsed: ProviderResponse | null): {
+  message?: string;
+  code?: string | number;
+} {
+  if (!parsed) return {};
+  const messageKeys = ["message", "detail", "description", "error_description"];
+  const codeKeys = ["code", "status_code"];
+  const visited = new Set<object>();
+  let bestMessage: string | undefined;
+  let bestCode: string | number | undefined;
+
+  const visit = (value: unknown, depth: number): void => {
+    if (depth > 6 || value === null || typeof value !== "object") return;
+    if (visited.has(value)) return;
+    visited.add(value);
+    const record = value as Record<string, unknown>;
+
+    for (const key of codeKeys) {
+      const candidate = record[key];
+      if (bestCode === undefined && (typeof candidate === "number" || typeof candidate === "string")) {
+        bestCode = candidate;
+      }
+    }
+    for (const key of messageKeys) {
+      const candidate = record[key];
+      if (typeof candidate === "string" && candidate.trim()) {
+        bestMessage ??= candidate;
+      }
+    }
+    if (typeof record.error === "string" && record.error.trim()) {
+      // Some gateways serialize the Google error object into `error`.
+      try {
+        visit(JSON.parse(record.error), depth + 1);
+      } catch {
+        bestMessage ??= record.error;
+      }
+    }
+    for (const key of ["error", "errors", "details", "data", "response", "body"]) {
+      const nested = record[key];
+      if (Array.isArray(nested)) {
+        for (const item of nested) visit(item, depth + 1);
+      } else {
+        visit(nested, depth + 1);
+      }
+    }
+  };
+
+  visit(parsed, 0);
+  return { message: bestMessage, code: bestCode };
+}
+
 function isRetryableError(parsed: ProviderResponse | null): boolean {
-  const code = typeof parsed?.error === "object" ? parsed.error?.code : undefined;
+  const code = extractProviderError(parsed).code;
   return typeof code === "string" && RETRYABLE_CODES.has(code);
 }
 
@@ -260,7 +343,7 @@ function classifyHttpStatus(status: number): ModelFailureKind {
 }
 
 function classifySoftError(parsed: ProviderResponse | null): ModelFailureKind {
-  const code = typeof parsed?.error === "object" ? parsed.error?.code : undefined;
+  const code = extractProviderError(parsed).code;
   const normalized = String(code ?? "").toLowerCase();
 
   if (normalized === "401" || normalized === "403") {
@@ -289,6 +372,7 @@ export async function chatCompletion(
   const maxTokens = options.maxTokens ?? 256;
   const fetchImpl = options.fetchImpl ?? fetch;
   const sleepImpl = options.sleepImpl ?? sleep;
+  const randomImpl = options.randomImpl ?? Math.random;
 
   // OpenRouter reasoning models can spend the entire completion budget on
   // hidden reasoning and then return null content. Disable it by default.
@@ -404,8 +488,8 @@ export async function chatCompletion(
         );
       }
       if (attempt < maxAttempts) {
-        const delay = 1000 * attempt;
-        if (Date.now() + delay >= callDeadline) {
+        const delay = retryDelay(attempt, callDeadline, null, randomImpl);
+        if (delay === null) {
           throw new ModelProviderError(
             "timeout",
             `${timeoutMessage(model, timeoutMs)} (attempt ${attempt}/${maxAttempts})`,
@@ -457,16 +541,23 @@ export async function chatCompletion(
     if (!response.ok) {
       const detail = describeProviderError(parsed, raw, messages, apiKey);
       const retryable =
-        RETRYABLE_STATUS.has(response.status) || isRetryableError(parsed);
+        RETRYABLE_STATUS.has(response.status) ||
+        ((response.status < 400 || response.status >= 500) &&
+          isRetryableError(parsed));
 
       console.warn(
         `[llm] provider error model=${returnedModel} endpoint=${endpoint} status=${
           response.status
-        } code=${String(typeof parsed?.error === "object" ? parsed.error?.code ?? "none" : "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
+        } code=${extractProviderError(parsed).code === undefined ? "none" : sanitizeProviderCode(extractProviderError(parsed).code)} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
       );
 
       if (retryable && attempt < maxAttempts) {
-        const delay = retryDelay(attempt, callDeadline);
+        const delay = retryDelay(
+          attempt,
+          callDeadline,
+          response.headers.get("retry-after"),
+          randomImpl,
+        );
         if (delay === null) {
           throw new ModelProviderError(
             "timeout",
@@ -490,10 +581,15 @@ export async function chatCompletion(
       console.warn(
         `[llm] provider error model=${returnedModel} endpoint=${endpoint} status=${
           response.status
-        } code=${String(typeof parsed.error === "object" ? parsed.error.code ?? "none" : "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
+        } code=${extractProviderError(parsed).code === undefined ? "none" : sanitizeProviderCode(extractProviderError(parsed).code)} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
       );
       if (retryable && attempt < maxAttempts) {
-        const delay = retryDelay(attempt, callDeadline);
+        const delay = retryDelay(
+          attempt,
+          callDeadline,
+          response.headers.get("retry-after"),
+          randomImpl,
+        );
         if (delay === null) {
           throw new ModelProviderError(
             "timeout",
