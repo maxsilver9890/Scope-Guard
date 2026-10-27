@@ -15,7 +15,11 @@ import {
   analysisResultsReducer,
   EMPTY_ANALYSIS_RESULTS,
 } from "@/lib/analysis-state";
-import { getPdfExportPreflight } from "@/lib/clarifications";
+import {
+  formatPdfPreflightSummary,
+  getPdfExportPreflight,
+  runPdfExportIntent,
+} from "@/lib/clarifications";
 import { ScopeInput } from "@/components/scope-input";
 import {
   isScopeComparison,
@@ -1310,20 +1314,24 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
     const current = latestExportStateRef.current;
     if (!current.editedScope || !current.findings) return;
 
-    if (getPdfExportPreflight(current.editedScope).requiresConfirmation) {
-      setPdfWarningOpen(true);
-      return;
-    }
-
-    void exportCurrentPdf();
+    runPdfExportIntent(current.editedScope, "download", {
+      warn: () => setPdfWarningOpen(true),
+      review: () => undefined,
+      download: () => void exportCurrentPdf(),
+    });
   }
 
   function handleResolveQuestionsFromWarning() {
     const currentScope = latestExportStateRef.current.editedScope;
-    const firstQuestion = currentScope
-      ? getPdfExportPreflight(currentScope).firstQuestion
-      : undefined;
+    if (!currentScope) return;
+    const reviewedQuestions: ScopeItem[] = [];
+    runPdfExportIntent(currentScope, "review", {
+      warn: () => undefined,
+      review: (question) => { if (question) reviewedQuestions.push(question); },
+      download: () => undefined,
+    });
     setPdfWarningOpen(false);
+    const firstQuestion = reviewedQuestions[0];
     if (!firstQuestion) {
       return;
     }
@@ -1448,7 +1456,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               id="pdf-pending-questions-description"
               className="mt-3 text-[13px] leading-6 text-muted"
             >
-              {pdfPreflight.count} {pdfPreflight.count === 1 ? "clarification question remains" : "clarification questions remain"} open in this scope. {pdfPreflight.unansweredCount > 0 ? `${pdfPreflight.unansweredCount} ${pdfPreflight.unansweredCount === 1 ? "has" : "have"} no answer. ` : ""}{pdfPreflight.tentativeCount > 0 ? `${pdfPreflight.tentativeCount} ${pdfPreflight.tentativeCount === 1 ? "has" : "have"} a tentative answer. ` : ""}{pdfPreflight.confirmedButUnresolvedCount > 0 ? `${pdfPreflight.confirmedButUnresolvedCount} ${pdfPreflight.confirmedButUnresolvedCount === 1 ? "has" : "have"} a client-confirmed answer but remains open because the decision is not resolved. ` : ""}Resolving them may improve the report. You can review the questions or download the current scope with its open issues clearly shown.
+              {formatPdfPreflightSummary(pdfPreflight)} Resolving them may improve the report. Review the questions or download the current draft with its open issues clearly shown.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <button
@@ -1462,8 +1470,16 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
               <button
                 type="button"
                 onClick={() => {
-                  setPdfWarningOpen(false);
-                  void exportCurrentPdf();
+                  const latestScope = latestExportStateRef.current.editedScope;
+                  if (!latestScope) return;
+                  runPdfExportIntent(latestScope, "download-anyway", {
+                    warn: () => undefined,
+                    review: () => undefined,
+                    download: () => {
+                      setPdfWarningOpen(false);
+                      void exportCurrentPdf();
+                    },
+                  });
                 }}
                 ref={downloadAnywayButtonRef}
                 className={TOOLBAR_PRIMARY}

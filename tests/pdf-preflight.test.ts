@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { getPdfExportPreflight } from "../src/lib/clarifications.ts";
+import { formatPdfPreflightSummary, getPdfExportPreflight, runPdfExportIntent } from "../src/lib/clarifications.ts";
 import type { Scope } from "../src/lib/schema.ts";
 
 function testScope(): Scope {
@@ -169,4 +169,81 @@ test("preflight associates a substantially reworded clarification with its open 
   const preflight = getPdfExportPreflight(scope);
   assert.equal(preflight.tentativeCount, 1);
   assert.equal(preflight.unansweredCount, 0);
+});
+
+test("twelve unresolved scope decisions trigger an exact, non-overlapping warning summary", () => {
+  const scope = testScope();
+  const decisions = [
+    "What delivery channel will customers use?",
+    "Who owns the product inventory approval?",
+    "Which countries are in the first rollout?",
+    "What date is the public announcement planned for?",
+    "Which supplier provides shipping rates?",
+    "Where should customer records be stored?",
+    "What process handles product returns?",
+    "Which team will maintain the catalog?",
+    "How are refunds approved by finance?",
+    "What accessibility standard should apply?",
+    "Which analytics events should be tracked?",
+    "Who signs off on the launch checklist?",
+  ];
+  scope.openQuestions = decisions.map((text) => ({
+    text,
+    status: "unresolved" as const,
+  }));
+  scope.clarifications = [
+    { id: "c1", question: scope.openQuestions[0].text, answer: "Maybe after review.", confirmed: false },
+    { id: "c2", question: scope.openQuestions[1].text, answer: "The client confirmed the preference, but timing remains open.", confirmed: true },
+  ];
+
+  const preflight = getPdfExportPreflight(scope);
+  assert.equal(preflight.count, 12);
+  assert.equal(preflight.unansweredCount, 10);
+  assert.equal(preflight.tentativeCount, 1);
+  assert.equal(preflight.confirmedButUnresolvedCount, 1);
+  assert.equal(
+    formatPdfPreflightSummary(preflight),
+    "12 scope decisions remain open: 10 unanswered clarification questions; 2 decisions have answers recorded but remain unresolved.",
+  );
+});
+
+test("Review questions never downloads and returns the first current unresolved decision", () => {
+  const scope = testScope();
+  const events: string[] = [];
+  const outcome = runPdfExportIntent(scope, "review", {
+    warn: () => events.push("warning"),
+    review: (question) => events.push(question?.text ?? "no-question"),
+    download: () => events.push("download"),
+  });
+
+  assert.equal(outcome, "review");
+  assert.deepEqual(events, [scope.openQuestions[0].text]);
+});
+
+test("Download anyway exports the latest supplied draft despite unresolved questions", () => {
+  const scope = testScope();
+  const latestDraft = { ...scope, problemStatement: "Latest edited draft." };
+  const events: unknown[] = [];
+  const outcome = runPdfExportIntent(latestDraft, "download-anyway", {
+    warn: () => events.push("warning"),
+    review: () => events.push("review"),
+    download: (current) => events.push(current),
+  });
+
+  assert.equal(outcome, "download");
+  assert.deepEqual(events, [latestDraft]);
+});
+
+test("a fully resolved scope downloads without a warning", () => {
+  const scope = testScope();
+  scope.openQuestions = scope.openQuestions.map((question) => ({ ...question, status: "confirmed" as const }));
+  const events: string[] = [];
+  const outcome = runPdfExportIntent(scope, "download", {
+    warn: () => events.push("warning"),
+    review: () => events.push("review"),
+    download: () => events.push("download"),
+  });
+
+  assert.equal(outcome, "download");
+  assert.deepEqual(events, ["download"]);
 });

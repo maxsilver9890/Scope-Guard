@@ -143,7 +143,7 @@ const DETAIL_PATTERNS = [
 ];
 
 const TENTATIVE_PATTERN =
-  /\b(?:maybe|perhaps|might|could|i think|i'?d have to|not sure|would love|if it'?s easy|let'?s say yes|we can always)\b/i;
+  /\b(?:maybe|perhaps|might|could|i think|i'?d have to|not sure|would love|would be useful|would be nice|i'?d (?:also )?like|we would like|if it'?s easy|let'?s say yes|we can always)\b|\b(?:i would like)\b|\b(?:i'?d|i would) like\b.{0,100}\b(?:propos\w*|consider\w*|recommend\w*|option)\b/i;
 
 /**
  * If the quote sits inside a client turn that also contains a caveat, treat

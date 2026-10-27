@@ -126,6 +126,38 @@ assert.equal(result.downgraded, 2);
   assert.match(result.scope.inScope[0].rationale ?? "", /tentative/i);
 });
 
+test("suggestions phrased as useful or explicitly proposed are not confirmed commitments", () => {
+  const source = `A better filter would be useful to shoppers.\nI'd also like a staff training session so our team can manage the store.`;
+  const scope = scopeWith({
+    requirements: [
+      item("Add a better filter for shoppers", "confirmed", {
+        sourceQuote: "A better filter would be useful to shoppers.",
+      }),
+      item("Provide staff training", "confirmed", {
+        sourceQuote: "I'd also like a staff training session so our team can manage the store.",
+      }),
+    ],
+  });
+
+  const result = repairScopeProvenance(scope, source);
+  assert.equal(result.downgraded, 2);
+  assert.deepEqual(result.scope.requirements.map((entry) => entry.status), ["proposed", "proposed"]);
+  assert.ok(result.scope.requirements.every((entry) => /tentative, not a confirmed commitment/i.test(entry.rationale ?? "")));
+});
+
+test("a firm directly requested feature remains confirmed", () => {
+  const source = "The team needs a searchable catalog for customers.";
+  const scope = scopeWith({
+    requirements: [item("Provide a searchable catalog", "confirmed", {
+      sourceQuote: source,
+    })],
+  });
+
+  const result = repairScopeProvenance(scope, source);
+  assert.equal(result.downgraded, 0);
+  assert.equal(result.scope.requirements[0].status, "confirmed");
+});
+
 test("repairScopeProvenance marks unsupported exclusions as proposed", () => {
   const scope = scopeWith({
     outOfScope: [

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { scopeToPdfDefinition } from "../src/lib/pdf-export.ts";
+import { formatPdfPreflightSummary, getPdfExportPreflight } from "../src/lib/clarifications.ts";
 import type { Scope } from "../src/lib/schema.ts";
 
 function collectText(value: unknown): string[] {
@@ -79,6 +80,29 @@ test("PDF clarifications distinguish confirmed answers", () => {
   assert.match(content, /Client-confirmed answer/);
   assert.match(content, /Current scope: question is no longer listed as open/);
   assert.match(content, /course descriptions and testimonials/);
+});
+
+test("warning and PDF show the same latest open clarification and its recorded answer", () => {
+  const answer = "The client wants a decision after reviewing vendor options.";
+  const scope: Scope = {
+    problemStatement: "A catalog needs a clear launch scope.",
+    inScope: [], outOfScope: [], assumptions: [],
+    openQuestions: [{ text: "Which vendor should support catalog search?", status: "unresolved" }],
+    requirements: [], acceptanceCriteria: [],
+    clarifications: [{
+      id: "c-latest", question: "Which vendor should support catalog search?",
+      answer, confirmed: false,
+    }],
+  };
+  const warningText = formatPdfPreflightSummary(getPdfExportPreflight(scope));
+  const pdfText = collectText(scopeToPdfDefinition(scope, []).content).join("\n");
+  const clarificationSection = pdfText.slice(pdfText.lastIndexOf("Client Clarifications"));
+
+  assert.match(warningText, /1 scope decision remains open: 0 unanswered clarification questions; 1 decision has an answer recorded but remains unresolved/);
+  assert.match(pdfText, /Which vendor should support catalog search\?/);
+  assert.match(pdfText, new RegExp(answer));
+  assert.match(pdfText, /Current scope: question remains open/);
+  assert.doesNotMatch(clarificationSection, /None recorded\./);
 });
 
 test("contents list includes every section without inaccurate page references", () => {

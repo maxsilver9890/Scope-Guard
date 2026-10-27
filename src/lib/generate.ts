@@ -30,6 +30,7 @@ Section rules:
 Fidelity rules:
 - Never invent quantitative targets, deadlines, budgets, synchronization intervals, export formats, testing percentages, SLAs, or security guarantees.
 - Never turn an aspiration into a confirmed commitment. "If it's easy", "would love", "maybe", and "I think" are not agreement.
+- A feature described only as "would be useful", "would be nice", or "I'd like" is a requested suggestion, not an approved commitment; mark it proposed. A client asking to include something as a proposal, option, or recommendation likewise does not confirm it. Keep an explicit firm instruction or commitment confirmed when the source clearly states it.
 - Tentative language such as "let's say yes for now", "we can always take it out", or "maybe not in the first version" is not confirmation. Mark that item proposed.
 - Client access with unresolved security concerns must be proposed or unresolved, never confirmed.
 - Keep a broad requirement broad. Do not add implementation details the source does not contain.

@@ -89,3 +89,43 @@ export function getPdfExportPreflight(
     ...(questions[0] ? { firstQuestion: questions[0].question } : {}),
   };
 }
+
+export type PdfExportIntent = "download" | "review" | "download-anyway";
+export type PdfExportOutcome = "warning" | "review" | "download";
+
+export function formatPdfPreflightSummary(
+  preflight: ReturnType<typeof getPdfExportPreflight>,
+): string {
+  const answeredButOpen = preflight.tentativeCount + preflight.confirmedButUnresolvedCount;
+  const decision = preflight.count === 1 ? "scope decision remains" : "scope decisions remain";
+  const clarification = preflight.unansweredCount === 1
+    ? "unanswered clarification question"
+    : "unanswered clarification questions";
+  const answered = answeredButOpen === 1
+    ? "decision has an answer recorded but remains unresolved"
+    : "decisions have answers recorded but remain unresolved";
+  return `${preflight.count} ${decision} open: ${preflight.unansweredCount} ${clarification}; ${answeredButOpen} ${answered}.`;
+}
+
+/** Shared export decision path used by the UI and its interaction tests. */
+export function runPdfExportIntent(
+  scope: Pick<Scope, "openQuestions" | "clarifications">,
+  intent: PdfExportIntent,
+  handlers: {
+    warn: (preflight: ReturnType<typeof getPdfExportPreflight>) => void;
+    review: (question: ScopeItem | undefined) => void;
+    download: (scope: Pick<Scope, "openQuestions" | "clarifications">) => void;
+  },
+): PdfExportOutcome {
+  const preflight = getPdfExportPreflight(scope);
+  if (intent === "review") {
+    handlers.review(preflight.firstQuestion);
+    return "review";
+  }
+  if (intent === "download-anyway" || !preflight.requiresConfirmation) {
+    handlers.download(scope);
+    return "download";
+  }
+  handlers.warn(preflight);
+  return "warning";
+}
