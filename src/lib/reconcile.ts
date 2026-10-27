@@ -52,6 +52,19 @@ const commitmentSections: CommitmentSection[] = [
 ];
 const includedSections: CommitmentSection[] = ["inScope", "requirements", "acceptanceCriteria"];
 
+/**
+ * Only findings that can indicate the scope disagrees with its source need a
+ * repair pass. Ambiguity and missing-information findings are already valid
+ * review output and do not justify two more model calls.
+ */
+export function requiresReconciliation(findings: Finding[]): boolean {
+  return findings.some(
+    (finding) =>
+      finding.type === "contradiction" ||
+      finding.type === "unsupported-assumption",
+  );
+}
+
 function preserveUnchallengedConfirmedItems(
   previous: Scope,
   generated: Scope,
@@ -146,7 +159,9 @@ export async function reconcileCritique(
   } = {},
   overrides: Partial<ReconciliationDependencies> = {},
 ): Promise<ReconciliationResult> {
-  if (findings.length === 0) return { scope, findings, reconciled: false };
+  if (findings.length === 0 || !requiresReconciliation(findings)) {
+    return { scope, findings, reconciled: false };
+  }
 
   const deps: ReconciliationDependencies = {
     generateScope,
@@ -168,7 +183,10 @@ export async function reconcileCritique(
     throw new ScopeReconciliationError("invalid-reconciled-scope");
   }
 
-  const reviewed = await deps.critiqueScope(input, parsed.data, { clarifications });
+  const reviewed = await deps.critiqueScope(input, parsed.data, {
+    clarifications,
+    deadline: options.deadline,
+  });
   const verifiedFindings = filterFindingsInconsistentWithScope(
     enforceFindingProvenance(reviewed, corpus).findings,
     parsed.data,

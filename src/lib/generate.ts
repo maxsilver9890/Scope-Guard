@@ -82,10 +82,12 @@ export type GenerateOptions = {
   clarification?: Clarification;
   /** All clarifications that should remain attached to the document. */
   clarifications?: Clarification[];
-  /** The current document, including manual edits, for context. */
+  /** The current document, including manual edits. */
   currentScope?: Scope;
   /** Findings that identified scope/source conflicts requiring one repair pass. */
   reconciliationFindings?: Finding[];
+  /** Absolute pipeline deadline shared by every model call. */
+  deadline?: number;
 };
 
 /** Strip an accidental markdown fence, then parse JSON. */
@@ -182,7 +184,7 @@ export async function generateScope(
         ),
       },
     ],
-    { temperature: 0.2, maxTokens: 5000, jsonMode: true },
+    { temperature: 0.2, maxTokens: 5000, jsonMode: true, deadline: options.deadline },
   );
 
   const parsed = rawScopeSchema.safeParse(parseJson(result.content));

@@ -1,7 +1,6 @@
+import { runAnalysisPipeline } from "@/lib/analysis-pipeline";
 import { toApiFailure } from "@/lib/api-errors";
-import { critiqueScope } from "@/lib/critique";
-import { generateScope } from "@/lib/generate";
-import { reconcileCritique, ScopeReconciliationError } from "@/lib/reconcile";
+import { ScopeReconciliationError } from "@/lib/reconcile";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -32,35 +31,51 @@ export async function POST(request: Request) {
   }
 
   const source = input.trim();
+  const outcome = await runAnalysisPipeline(source);
 
-  try {
-    const initialScope = await generateScope(source);
-    const initialFindings = await critiqueScope(source, initialScope);
-    const { scope, findings } = await reconcileCritique(
-      source,
-      initialScope,
-      initialFindings,
+  if (outcome.ok) {
+    console.info(
+      `[analyze] completed modelCalls=${outcome.modelCalls} reconciled=${
+        outcome.reconciled
+      } total=${outcome.totalMs}ms generation=${
+        outcome.stageMs.generation ?? 0
+      }ms review=${outcome.stageMs.review ?? 0}ms reconciliation=${
+        outcome.stageMs.reconciliation ?? 0
+      }ms`,
     );
-
-    return Response.json({ scope, findings });
-  } catch (error) {
-    if (error instanceof ScopeReconciliationError) {
-      console.warn("[analyze] validation rejected", {
-        stage: error.stage,
-        category: error.category,
-      });
-      return Response.json(
-        {
-          error: error.message,
-          ...(error.conflicts.length > 0 ? { conflicts: error.conflicts } : {}),
-        },
-        { status: 422 },
-      );
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[analyze] pipeline failed:", message);
-
-    const failure = toApiFailure(error);
-    return Response.json({ error: failure.error }, { status: failure.status });
+    return Response.json({ scope: outcome.scope, findings: outcome.findings });
   }
+
+  if (outcome.error instanceof ScopeReconciliationError) {
+    console.warn("[analyze] validation rejected", {
+      stage: outcome.error.stage,
+      category: outcome.error.category,
+      totalMs: outcome.totalMs,
+      completedScope: Boolean(outcome.completed.scope),
+      completedFindings: outcome.completed.findings?.length ?? 0,
+    });
+    return Response.json(
+      {
+        error: outcome.error.message,
+        ...(outcome.error.conflicts.length > 0
+          ? { conflicts: outcome.error.conflicts }
+          : {}),
+      },
+      { status: 422 },
+    );
+  }
+
+  const message =
+    outcome.error instanceof Error
+      ? outcome.error.message
+      : String(outcome.error);
+
+  console.error(
+    `[analyze] pipeline failed stage=${outcome.stage} total=${outcome.totalMs}ms completedScope=${Boolean(
+      outcome.completed.scope,
+    )} completedFindings=${outcome.completed.findings?.length ?? 0}: ${message}`,
+  );
+
+  const failure = toApiFailure(outcome.error);
+  return Response.json({ error: failure.error }, { status: failure.status });
 }

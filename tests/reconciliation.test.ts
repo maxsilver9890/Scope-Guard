@@ -145,6 +145,33 @@ test("Northstar critique is reconciled into the effective scope and then re-revi
   assert.equal(result.scope.inScope.some((item) => /online appointment booking will be included/i.test(item.text)), false);
 });
 
+test("reconciliation passes the shared pipeline deadline to both model calls", async () => {
+  let generationDeadline: number | undefined;
+  let reviewDeadline: number | undefined;
+  const deadline = Date.now() + 60_000;
+
+  const result = await reconcileCritique(
+    compatibleClaims.transcript,
+    compatibleClaims.scope,
+    [compatibleClaims.finding],
+    { deadline },
+    {
+      generateScope: async (_input, options) => {
+        generationDeadline = options?.deadline;
+        return compatibleClaims.scope;
+      },
+      critiqueScope: async (_input, _scope, options) => {
+        reviewDeadline = options?.deadline;
+        return [compatibleClaims.finding];
+      },
+    },
+  );
+
+  assert.equal(result.reconciled, true);
+  assert.equal(generationDeadline, deadline);
+  assert.equal(reviewDeadline, deadline);
+});
+
 test("unsupported reconciliation claims are downgraded by provenance validation", async () => {
   const transcript = await loadTranscript();
   const unsupported = {

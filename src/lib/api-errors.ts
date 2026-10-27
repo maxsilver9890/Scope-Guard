@@ -32,7 +32,7 @@ export function toApiFailure(
         return {
           status: 504,
           error:
-            "The analysis timed out before the model finished. Please try again.",
+            "The analysis timed out before the model finished. Retry once, or configure SCOPE_GUARD_MODEL with a faster OpenRouter-compatible model.",
         };
       case "unavailable":
         return {

@@ -1,3 +1,4 @@
+import { readAnalysisPipelineTimeoutMs } from "@/lib/analysis-pipeline";
 import { toApiFailure } from "@/lib/api-errors";
 import {
   ResolveInputError,
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await resolveScope(parsed.data);
+    const deadline = Date.now() + readAnalysisPipelineTimeoutMs();
+    const result = await resolveScope(parsed.data, {}, { deadline });
     return Response.json(result);
   } catch (error) {
     if (error instanceof ResolveInputError) {

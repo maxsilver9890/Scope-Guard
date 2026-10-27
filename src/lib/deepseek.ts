@@ -5,10 +5,12 @@
  * targets OpenRouter, and the model is fixed through DEEPSEEK_MODEL.
  *
  * Environment:
- *   DEEPSEEK_API_KEY    - provider API key
- *   DEEPSEEK_BASE_URL   - optional, defaults to https://api.deepseek.com/v1
- *   DEEPSEEK_MODEL      - required; fixed provider model id
- *   DEEPSEEK_TIMEOUT_MS - optional total request timeout, default 75000
+ *   DEEPSEEK_API_KEY            - provider API key
+ *   DEEPSEEK_BASE_URL           - optional, defaults to https://api.deepseek.com/v1
+ *   DEEPSEEK_MODEL              - fallback analysis model
+ *   SCOPE_GUARD_MODEL           - optional analysis model override
+ *   DEEPSEEK_TIMEOUT_MS         - per model call budget, default 60000
+ *   DEEPSEEK_MAX_ATTEMPTS       - retry attempts per call, default 2 (max 3)
  */
 
 export type ModelFailureKind =
@@ -72,6 +74,15 @@ export type ChatCompletionOptions = {
    * Pass `null` to omit the parameter entirely.
    */
   reasoning?: Record<string, unknown> | null;
+  /** Per-call budget. Defaults to DEEPSEEK_TIMEOUT_MS. */
+  timeoutMs?: number;
+  /** Absolute deadline shared by the whole analysis pipeline. */
+  deadline?: number;
+  /** Retry attempts for transient provider failures. */
+  maxAttempts?: number;
+  /** Injectable dependencies for deterministic tests. */
+  fetchImpl?: typeof fetch;
+  sleepImpl?: (ms: number) => Promise<void>;
 };
 
 type ProviderResponse = {
@@ -92,8 +103,10 @@ type ProviderResponse = {
 
 export const DEEPSEEK_DEFAULT_BASE_URL = "https://api.deepseek.com/v1";
 
-const DEFAULT_TIMEOUT_MS = 75_000;
-const MAX_ATTEMPTS = 3;
+const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_MAX_ATTEMPTS = 2;
+const MAX_ATTEMPTS_LIMIT = 3;
+const ATTEMPT_TIMEOUT_MS = 60_000;
 const RETRYABLE_STATUS = new Set([408, 409, 429, 500, 502, 503, 504]);
 const RETRYABLE_CODES = new Set([
   "rate_limit_exceeded",
@@ -118,6 +131,32 @@ function readTimeoutMs(): number {
     return DEFAULT_TIMEOUT_MS;
   }
   return Math.min(Math.max(configured, 5_000), 180_000);
+}
+
+function readMaxAttempts(): number {
+  const configured = Number(process.env.DEEPSEEK_MAX_ATTEMPTS);
+  if (!Number.isInteger(configured) || configured <= 0) {
+    return DEFAULT_MAX_ATTEMPTS;
+  }
+  return Math.min(configured, MAX_ATTEMPTS_LIMIT);
+}
+
+/** A new model override keeps DEEPSEEK_MODEL as the existing fallback. */
+function readModel(): string {
+  const override = process.env.SCOPE_GUARD_MODEL?.trim();
+  if (override) {
+    return override;
+  }
+  return requireEnv("DEEPSEEK_MODEL");
+}
+
+function timeoutMessage(model: string, timeoutMs: number): string {
+  return `Model request exceeded ${timeoutMs}ms (model: ${model}). Retry once, or set SCOPE_GUARD_MODEL to a faster OpenRouter-compatible model.`;
+}
+
+function retryDelay(attempt: number, callDeadline: number): number | null {
+  const delay = 1000 * attempt * attempt;
+  return Date.now() + delay < callDeadline ? delay : null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -195,9 +234,15 @@ export async function chatCompletion(
   const baseUrl = (
     process.env.DEEPSEEK_BASE_URL?.trim() || DEEPSEEK_DEFAULT_BASE_URL
   ).replace(/\/+$/, "");
-  const model = requireEnv("DEEPSEEK_MODEL");
-  const timeoutMs = readTimeoutMs();
+  const model = readModel();
+  const timeoutMs = options.timeoutMs ?? readTimeoutMs();
+  const maxAttempts = Math.max(
+    1,
+    Math.min(options.maxAttempts ?? readMaxAttempts(), MAX_ATTEMPTS_LIMIT),
+  );
   const maxTokens = options.maxTokens ?? 256;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const sleepImpl = options.sleepImpl ?? sleep;
 
   // OpenRouter reasoning models can spend the entire completion budget on
   // hidden reasoning and then return null content. Disable it by default.
@@ -209,16 +254,21 @@ export async function chatCompletion(
         : undefined
       : options.reasoning;
 
-  const deadline = Date.now() + timeoutMs;
+  const callDeadline = Math.min(
+    Date.now() + timeoutMs,
+    options.deadline ?? Number.POSITIVE_INFINITY,
+  );
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const remaining = deadline - Date.now();
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const remaining = callDeadline - Date.now();
     if (remaining <= 0) {
       throw new ModelProviderError(
         "timeout",
-        `Model request exceeded ${timeoutMs}ms (model: ${model}).`,
+        timeoutMessage(model, timeoutMs),
       );
     }
+
+    const attemptTimeout = Math.min(remaining, ATTEMPT_TIMEOUT_MS);
 
     const body: Record<string, unknown> = {
       model,
@@ -249,14 +299,14 @@ export async function chatCompletion(
     let raw: string;
 
     try {
-      response = await fetch(`${baseUrl}/chat/completions`, {
+      response = await fetchImpl(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(Math.min(remaining, 60_000)),
+        signal: AbortSignal.timeout(attemptTimeout),
       });
       raw = await response.text();
     } catch (error) {
@@ -273,16 +323,23 @@ export async function chatCompletion(
       if (timedOut) {
         throw new ModelProviderError(
           "timeout",
-          `Model request timed out (model: ${model}, timeout: ${timeoutMs}ms). Try again or use a faster model.`,
+          `${timeoutMessage(model, attemptTimeout)} (attempt ${attempt}/${maxAttempts})`,
         );
       }
-      if (attempt < MAX_ATTEMPTS) {
-        await sleep(1000 * attempt);
+      if (attempt < maxAttempts) {
+        const delay = 1000 * attempt;
+        if (Date.now() + delay >= callDeadline) {
+          throw new ModelProviderError(
+            "timeout",
+            `${timeoutMessage(model, timeoutMs)} (attempt ${attempt}/${maxAttempts})`,
+          );
+        }
+        await sleepImpl(delay);
         continue;
       }
       throw new ModelProviderError(
         "unavailable",
-        `Could not reach the model provider after ${MAX_ATTEMPTS} attempts (model: ${model}).`,
+        `Could not reach the model provider after ${maxAttempts} attempts (model: ${model}).`,
       );
     }
 
@@ -303,7 +360,7 @@ export async function chatCompletion(
     console.info(
       `[llm] model=${model} returned=${returnedModel} finish=${
         finishReason ?? "?"
-      } ${usageSummary(usage)} ${Date.now() - startedAt}ms`,
+      } ${usageSummary(usage)} ${Date.now() - startedAt}ms attempt=${attempt}`,
     );
 
     if (!response.ok) {
@@ -311,8 +368,15 @@ export async function chatCompletion(
       const retryable =
         RETRYABLE_STATUS.has(response.status) || isRetryableError(parsed);
 
-      if (retryable && attempt < MAX_ATTEMPTS) {
-        await sleep(1000 * attempt * attempt);
+      if (retryable && attempt < maxAttempts) {
+        const delay = retryDelay(attempt, callDeadline);
+        if (delay === null) {
+          throw new ModelProviderError(
+            "timeout",
+            `${timeoutMessage(model, timeoutMs)} (retry budget exhausted after attempt ${attempt}/${maxAttempts})`,
+          );
+        }
+        await sleepImpl(delay);
         continue;
       }
 
@@ -325,8 +389,15 @@ export async function chatCompletion(
 
     if (parsed?.error) {
       const detail = describeProviderError(parsed, raw);
-      if (isRetryableError(parsed) && attempt < MAX_ATTEMPTS) {
-        await sleep(1000 * attempt * attempt);
+      if (isRetryableError(parsed) && attempt < maxAttempts) {
+        const delay = retryDelay(attempt, callDeadline);
+        if (delay === null) {
+          throw new ModelProviderError(
+            "timeout",
+            `${timeoutMessage(model, timeoutMs)} (retry budget exhausted after attempt ${attempt}/${maxAttempts})`,
+          );
+        }
+        await sleepImpl(delay);
         continue;
       }
       throw new ModelProviderError(

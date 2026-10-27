@@ -21,6 +21,7 @@ test("provider timeouts map to 504", () => {
 
   assert.equal(failure.status, 504);
   assert.match(failure.error, /timed out/i);
+  assert.match(failure.error, /SCOPE_GUARD_MODEL/);
 });
 
 test("temporary provider failures map to 503", () => {

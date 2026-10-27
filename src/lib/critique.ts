@@ -128,6 +128,8 @@ function issuesFrom(error: {
 
 export type CritiqueOptions = {
   clarifications?: Clarification[];
+  /** Absolute pipeline deadline shared by every model call. */
+  deadline?: number;
 };
 
 function buildSourceMaterial(
@@ -167,6 +169,7 @@ ${formatScopeForReview(scope)}`;
       temperature: 0.2,
       maxTokens: 3000,
       jsonSchema: { name: "scope_guard_findings", schema: FINDINGS_JSON_SCHEMA },
+      deadline: options.deadline,
     },
   );
 

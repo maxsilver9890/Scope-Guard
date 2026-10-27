@@ -120,8 +120,10 @@ Source transcript / brief
           ├── enforceFindingProvenance()
           └── scope-consistency finding filter
           │
+          ├── no contradiction / unsupported assumption → return 2-call result
+          │
           ▼
-  reconcileCritique()
+  reconcileCritique()   (only when the review indicates a scope repair)
           │
           ├── one generation repair pass
           ├── provenance repair
@@ -132,11 +134,16 @@ Source transcript / brief
   Scope + findings returned to the workspace
 ```
 
+A normal analysis uses **two model calls**: generation and independent review. A bounded reconciliation pass adds two more calls only when the review contains a contradiction or unsupported assumption that may require changing the scope. Purely informational findings — ambiguity and missing information — do not trigger repeated generation.
+
+Every model call shares one absolute pipeline deadline (`SCOPE_GUARD_PIPELINE_TIMEOUT_MS`, default 75 seconds). The deadline is enforced before each stage and inside the provider client, so a slow call cannot keep the request alive indefinitely. Timeouts fail with a clear `504` response instead of returning a partial scope as if analysis succeeded. Validated results from completed stages are retained for diagnostics, but are never returned as a successful full analysis.
+
 When a clarification is applied, `resolveScope()` additionally:
 - validates the selected open question;
 - preserves unrelated confirmed commitments;
 - blocks unsupported promotions to confirmed;
 - preserves the latest clarification history;
+- shares the same absolute pipeline deadline as first-pass analysis;
 - computes the deterministic before/after comparison.
 
 The original transcript is never rewritten. Clarifications are stored separately as `{ id, question, answer, confirmed }`. Scope items and findings record `sourceKind` (`transcript` or `clarification`) and, where applicable, `clarificationId`.
@@ -178,7 +185,8 @@ No UI component library, charting library, or rich-text editor is used. The land
 | `src/lib/clarifications.ts` | Unresolved-question preflight and PDF action routing. |
 | `src/lib/pdf-export.ts` | PDF document definition and client download. |
 | `src/lib/schema.ts` | Zod schemas, statuses, clarifications, and findings. |
-| `src/lib/deepseek.ts` | OpenAI-compatible provider client, timeout, retries, and structured output support. |
+| `src/lib/deepseek.ts` | OpenAI-compatible provider client, model override, timeout, retries, and structured output support. |
+| `src/lib/analysis-pipeline.ts` | Two-call analysis orchestration, conditional reconciliation, stage timing, and shared pipeline deadline. |
 | `src/lib/analysis-state.ts` | Atomic result state, analysis labels, and loading guidance. |
 | `tests/` | Unit, route, pipeline, provenance, comparison, and PDF tests. |
 
@@ -197,11 +205,20 @@ Fill in the provider key in `.env.local`. The current example targets OpenRouter
 DEEPSEEK_API_KEY=<your OpenRouter key>
 DEEPSEEK_BASE_URL=https://openrouter.ai/api/v1
 DEEPSEEK_MODEL=dots-studio/dots-3-note-preview:free
+# Optional faster/reliable analysis model override:
+# SCOPE_GUARD_MODEL=<openrouter-compatible-model-id>
 OPENROUTER_TRANSCRIPTION_MODEL=openai/gpt-transcribe
-DEEPSEEK_TIMEOUT_MS=75000
+# Per model call budget (default 60000):
+# DEEPSEEK_TIMEOUT_MS=60000
+# Retry attempts for transient provider failures (default 2, maximum 3):
+# DEEPSEEK_MAX_ATTEMPTS=2
+# Overall analysis budget (default 75000):
+# SCOPE_GUARD_PIPELINE_TIMEOUT_MS=75000
 ```
 
-`DEEPSEEK_MODEL` is required and is the single analysis-model configuration point. `OPENROUTER_TRANSCRIPTION_MODEL` is used only for audio transcription and defaults to `openai/gpt-transcribe` in the adapter.
+`DEEPSEEK_MODEL` is the required fallback analysis model. `SCOPE_GUARD_MODEL` optionally overrides it without editing source code — set it to a faster OpenRouter-compatible model id when analysis latency is a problem. `OPENROUTER_TRANSCRIPTION_MODEL` is used only for audio transcription and defaults to `openai/gpt-transcribe` in the adapter.
+
+The provider client retries transient failures within the call and pipeline budgets. A per-attempt timeout is never retried, because retrying a timeout makes the total request slower. The overall pipeline budget remains the hard limit even when retries are available.
 
 Never commit `.env.local`. It is ignored.
 
@@ -227,7 +244,7 @@ git diff --check
 
 Current state:
 
-- **167 tests pass.**
+- **186 tests pass.**
 - TypeScript and ESLint pass.
 - The production build succeeds.
 - `/` and `/workspace` are prerendered; API routes remain dynamic.

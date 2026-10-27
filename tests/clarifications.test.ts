@@ -719,3 +719,29 @@ test("an existing unconfirmed clarification cannot promote a proposal", async ()
     /unconfirmed/i,
   );
 });
+
+test("resolveScope passes the shared pipeline deadline to generation and review", async () => {
+  const deadline = Date.now() + 60_000;
+  let generationDeadline: number | undefined;
+  let reviewDeadline: number | undefined;
+
+  const result = await resolveScope(
+    request(),
+    {
+      generateScope: async (_input, options) => {
+        generationDeadline = options?.deadline;
+        return generatedScope(true);
+      },
+      critiqueScope: async (_input, _scope, options) => {
+        reviewDeadline = options?.deadline;
+        return [];
+      },
+      newClarificationId: () => "c1",
+    },
+    { deadline },
+  );
+
+  assert.equal(generationDeadline, deadline);
+  assert.equal(reviewDeadline, deadline);
+  assert.equal(result.scope.requirements[0].status, "confirmed");
+});

@@ -54,6 +54,11 @@ export type ResolveDependencies = {
   newClarificationId: () => string;
 };
 
+export type ResolveOptions = {
+  /** Absolute deadline shared by generation, review, and reconciliation. */
+  deadline?: number;
+};
+
 export class ResolveInputError extends Error {
   constructor(message: string) {
     super(message);
@@ -241,6 +246,7 @@ function enforcePromotionRules(
 export async function resolveScope(
   request: ResolveRequest | unknown,
   overrides: Partial<ResolveDependencies> = {},
+  options: ResolveOptions = {},
 ): Promise<ResolveResult> {
   const parsed = resolveRequestSchema.safeParse(request);
   if (!parsed.success) {
@@ -286,6 +292,7 @@ export async function resolveScope(
     clarification,
     clarifications,
     currentScope: data.scope,
+    deadline: options.deadline,
   });
 
   // Re-run provenance here as a trust boundary, even though the real
@@ -325,13 +332,13 @@ export async function resolveScope(
   const generatedFindings = await deps.critiqueScope(
     data.input,
     verified.data,
-    { clarifications },
+    { clarifications, deadline: options.deadline },
   );
   const reconciled = await reconcileCritique(
     data.input,
     verified.data,
     enforceFindingProvenance(generatedFindings, corpus).findings,
-    { clarifications },
+    { clarifications, deadline: options.deadline },
     { generateScope: deps.generateScope, critiqueScope: deps.critiqueScope },
   );
 
