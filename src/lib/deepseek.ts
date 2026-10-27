@@ -78,7 +78,7 @@ export type ChatCompletionOptions = {
   reasoning?: Record<string, unknown> | null;
   /**
    * OpenAI-compatible reasoning effort. Direct Gemini 3 endpoints default to
-   * `"minimal"`; other providers omit it. Pass `null` to omit it explicitly.
+   * `"low"`; other providers omit it. Pass `null` to omit it explicitly.
    */
   reasoningEffort?: ReasoningEffort | null;
   /** Per-call budget. Defaults to DEEPSEEK_TIMEOUT_MS. */
@@ -94,9 +94,10 @@ export type ChatCompletionOptions = {
 
 type ProviderResponse = {
   model?: string;
-  error?: {
+  error?: string | {
     message?: string;
     code?: string | number;
+    status?: string;
   };
   choices?: Array<{
     finish_reason?: string;
@@ -216,12 +217,20 @@ function usageSummary(usage?: ChatCompletionUsage): string {
 function describeProviderError(
   parsed: ProviderResponse | null,
   raw: string,
+  messages: ChatMessage[],
+  apiKey: string,
 ): string {
-  const message = parsed?.error?.message;
-  const code = parsed?.error?.code;
+  const providerError = parsed?.error;
+  const message =
+    typeof providerError === "string" ? providerError : providerError?.message;
+  const code = typeof providerError === "object" ? providerError?.code : undefined;
 
   if (typeof message === "string" && message.trim()) {
-    const summary = truncate(message, 200);
+    let sanitized = message;
+    for (const secret of [apiKey, ...messages.map(({ content }) => content)]) {
+      if (secret) sanitized = sanitized.replaceAll(secret, "[redacted]");
+    }
+    const summary = truncate(sanitized, 200);
     return code ? `${summary} (code: ${String(code)})` : summary;
   }
 
@@ -230,7 +239,7 @@ function describeProviderError(
 }
 
 function isRetryableError(parsed: ProviderResponse | null): boolean {
-  const code = parsed?.error?.code;
+  const code = typeof parsed?.error === "object" ? parsed.error?.code : undefined;
   return typeof code === "string" && RETRYABLE_CODES.has(code);
 }
 
@@ -251,7 +260,7 @@ function classifyHttpStatus(status: number): ModelFailureKind {
 }
 
 function classifySoftError(parsed: ProviderResponse | null): ModelFailureKind {
-  const code = parsed?.error?.code;
+  const code = typeof parsed?.error === "object" ? parsed.error?.code : undefined;
   const normalized = String(code ?? "").toLowerCase();
 
   if (normalized === "401" || normalized === "403") {
@@ -293,7 +302,7 @@ export async function chatCompletion(
   const reasoningEffort =
     options.reasoningEffort === undefined
       ? isDirectGemini3Endpoint(baseUrl, model)
-        ? "minimal"
+        ? "low"
         : undefined
       : options.reasoningEffort;
   const responseFormat = options.jsonSchema
@@ -446,14 +455,14 @@ export async function chatCompletion(
     );
 
     if (!response.ok) {
-      const detail = describeProviderError(parsed, raw);
+      const detail = describeProviderError(parsed, raw, messages, apiKey);
       const retryable =
         RETRYABLE_STATUS.has(response.status) || isRetryableError(parsed);
 
       console.warn(
         `[llm] provider error model=${returnedModel} endpoint=${endpoint} status=${
           response.status
-        } code=${String(parsed?.error?.code ?? "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
+        } code=${String(typeof parsed?.error === "object" ? parsed.error?.code ?? "none" : "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
       );
 
       if (retryable && attempt < maxAttempts) {
@@ -476,12 +485,12 @@ export async function chatCompletion(
     }
 
     if (parsed?.error) {
-      const detail = describeProviderError(parsed, raw);
+      const detail = describeProviderError(parsed, raw, messages, apiKey);
       const retryable = isRetryableError(parsed);
       console.warn(
         `[llm] provider error model=${returnedModel} endpoint=${endpoint} status=${
           response.status
-        } code=${String(parsed.error.code ?? "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
+        } code=${String(typeof parsed.error === "object" ? parsed.error.code ?? "none" : "none")} attempt=${attempt}/${maxAttempts} retryable=${retryable} detail=${detail}`,
       );
       if (retryable && attempt < maxAttempts) {
         const delay = retryDelay(attempt, callDeadline);

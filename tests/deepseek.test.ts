@@ -100,7 +100,7 @@ test("SCOPE_GUARD_MODEL overrides the existing analysis model", async () => {
   );
 });
 
-test("direct Gemini 3 requests send documented minimal reasoning effort", async () => {
+test("direct Gemini 3 requests send documented low reasoning effort", async () => {
   await withEnv(
     {
       DEEPSEEK_MODEL: "gemini-3.8-flash",
@@ -135,7 +135,7 @@ test("direct Gemini 3 requests send documented minimal reasoning effort", async 
       assert.equal(requestedBody.max_tokens, 5000);
       assert.equal(requestedBody.stream, false);
       assert.deepEqual(requestedBody.response_format, { type: "json_object" });
-      assert.equal(requestedBody.reasoning_effort, "minimal");
+      assert.equal(requestedBody.reasoning_effort, "low");
       assert.equal("reasoning" in requestedBody, false);
     },
   );
@@ -172,7 +172,7 @@ test("retryable provider errors log status and redact prompt content and keys", 
         const fetcher: typeof fetch = async (_input, init) => {
           calls += 1;
           const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-          assert.equal(body.reasoning_effort, "minimal");
+          assert.equal(body.reasoning_effort, "low");
 
           if (calls === 1) {
             return new Response(`upstream error: ${sensitiveText}`, {
@@ -199,13 +199,66 @@ test("retryable provider errors log status and redact prompt content and keys", 
         const output = logs.join("\n");
         assert.match(output, /status=503/);
         assert.match(output, /retryable=true/);
-        assert.match(output, /reasoning_effort=minimal/);
+        assert.match(output, /reasoning_effort=low/);
         assert.equal(output.includes(apiKey), false);
         assert.equal(output.includes(sensitiveText), false);
       } finally {
         console.info = originalInfo;
         console.warn = originalWarn;
         console.error = originalError;
+      }
+    },
+  );
+});
+
+test("provider errors expose sanitized messages without prompt or key echoes", async () => {
+  await withEnv(
+    {
+      DEEPSEEK_MODEL: "gemini-3.8-flash",
+      SCOPE_GUARD_MODEL: null,
+      DEEPSEEK_BASE_URL:
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+    },
+    async () => {
+      const logs: string[] = [];
+      const originalWarn = console.warn;
+      const prompt = "Private project transcript";
+      const key = "test-key-not-a-real-credential";
+      console.warn = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+
+      try {
+        const fetcher: typeof fetch = async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                code: 400,
+                message: `Invalid request for ${prompt}; credential ${key}`,
+                status: "INVALID_ARGUMENT",
+              },
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+
+        await assert.rejects(
+          chatCompletion([{ role: "user", content: prompt }], {
+            fetchImpl: fetcher,
+            maxAttempts: 1,
+          }),
+          (error: unknown) =>
+            error instanceof ModelProviderError &&
+            error.message.includes("Invalid request") &&
+            error.message.includes("[redacted]") &&
+            !error.message.includes(prompt) &&
+            !error.message.includes(key),
+        );
+
+        const output = logs.join("\n");
+        assert.match(output, /Invalid request/);
+        assert.match(output, /code=400/);
+        assert.equal(output.includes(prompt), false);
+        assert.equal(output.includes(key), false);
+      } finally {
+        console.warn = originalWarn;
       }
     },
   );
