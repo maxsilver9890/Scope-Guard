@@ -69,61 +69,65 @@ export default async function Home() {
 
   return (
     <div className="flex min-h-full flex-1 flex-col text-ink">
-      <header className="sticky top-0 z-40 border-b border-line/60 bg-canvas/70 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(27,36,64,0.85)] backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1480px] items-center justify-between gap-4 px-4 py-3.5 sm:gap-6 sm:px-8 lg:px-12">
           <Link
             href="/"
-            className="flex min-w-0 items-center gap-3.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="flex min-w-0 items-center gap-3.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#1b2440]"
             aria-label="Scope Guard overview"
           >
             <BrandMark />
             <div className="flex min-w-0 items-baseline gap-3">
-              <span className="whitespace-nowrap font-serif text-[20px] leading-none tracking-[-0.015em] text-forest">
+              <span className="whitespace-nowrap font-serif text-[20px] leading-none tracking-[-0.015em] text-text-on-dark">
                 Scope Guard
               </span>
-              <span className="hidden text-[9px] font-medium uppercase tracking-[0.24em] text-muted sm:inline">
+              <span className="hidden text-[9px] font-medium uppercase tracking-[0.24em] text-[#94a3b8] sm:inline">
                 Scoping intelligence
               </span>
             </div>
           </Link>
-          <div className="hidden shrink-0 items-center gap-2 rounded-full border border-line/70 bg-white/60 px-3 py-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:flex">
+          <div className="hidden shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.12)] sm:flex">
             <span
-              className="h-1.5 w-1.5 rounded-full bg-accent"
+              className="h-1.5 w-1.5 rounded-full bg-[#a5b4fc]"
               aria-hidden="true"
             />
-            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
+            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#cbd5e1]">
               Analysis workspace
             </span>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1480px] px-5 pb-24 sm:px-8 lg:px-12">
-        <section className="border-b border-line/70 py-6 lg:py-7">
-          <div className="grid gap-6 lg:grid-cols-12 lg:items-end lg:gap-10">
-            <div className="lg:col-span-8">
-              <div className="flex items-center gap-3">
-                <span className="h-px w-8 bg-accent/70" aria-hidden="true" />
-                <p className="text-[9.5px] font-medium uppercase tracking-[0.26em] text-accent">
-                  From conversation to clarity
+      <div className="border-b border-white/10 bg-canvas-dark">
+        <div className="mx-auto w-full max-w-[1480px] px-5 sm:px-8 lg:px-12">
+          <section className="py-10 lg:py-14">
+            <div className="grid gap-6 lg:grid-cols-12 lg:items-end lg:gap-10">
+              <div className="lg:col-span-8">
+                <div className="flex items-center gap-3">
+                  <span className="h-px w-8 bg-[#a5b4fc]/70" aria-hidden="true" />
+                  <p className="text-[9.5px] font-medium uppercase tracking-[0.26em] text-[#a5b4fc]">
+                    From conversation to clarity
+                  </p>
+                </div>
+                <h1 className="mt-3 max-w-none font-serif text-[clamp(2.05rem,3.7vw,3rem)] leading-[1.05] tracking-[-0.024em] text-[#f0eff8] sm:max-w-[24ch]">
+                  Build the right thing.
+                  <span className="block text-[#94a3b8]">
+                    Before you build anything.
+                  </span>
+                </h1>
+              </div>
+              <div className="lg:col-span-4 lg:pb-1">
+                <p className="max-w-sm text-[13.5px] leading-6 text-[#94a3b8] lg:ml-auto">
+                  Turn client conversations into explicit scope, testable
+                  requirements, and risks your team can act on.
                 </p>
               </div>
-              <h1 className="mt-3 max-w-none font-serif text-[clamp(1.9rem,3.4vw,2.7rem)] leading-[1.05] tracking-[-0.024em] text-forest sm:max-w-[24ch]">
-                Build the right thing.
-                <span className="block text-forest/75">
-                  Before you build anything.
-                </span>
-              </h1>
             </div>
-            <div className="lg:col-span-4 lg:pb-1">
-              <p className="max-w-sm text-[13.5px] leading-6 text-muted lg:ml-auto">
-                Turn client conversations into explicit scope, testable
-                requirements, and risks your team can act on.
-              </p>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
+      </div>
 
+      <main className="mx-auto w-full max-w-[1480px] px-5 pb-24 pt-8 sm:px-8 lg:px-12">
         <ScopeWorkspace initialInput={transcript} />
       </main>
     </div>

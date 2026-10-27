@@ -14,6 +14,9 @@
   --accent-strong: #4338ca;
   --accent-soft: #eef1fb;
   --accent-line: #d9dcef;
+
+  --canvas-dark: #1b2440;
+  --text-on-dark: #f0eff8;
 }
 
 @theme inline {
@@ -30,6 +33,9 @@
   --color-accent-strong: #4338ca;
   --color-accent-soft: #eef1fb;
   --color-accent-line: #d9dcef;
+
+  --color-canvas-dark: #1b2440;
+  --color-text-on-dark: #f0eff8;
 
   --color-cream: #fafaf7;
   --color-lav: #e9e5ff;
