@@ -104,6 +104,23 @@ test("compareScopes reports added and removed items", () => {
   );
 });
 
+test("compareScopes reports a section move without claiming a decision was added or resolved", () => {
+  const proposedFilter = {
+    text: "Product filtering remains proposed pending client approval.",
+    status: "proposed" as const,
+    rationale: "The client described it as useful, not approved.",
+  };
+  const before = scope({ requirements: [proposedFilter] });
+  const after = scope({ inScope: [proposedFilter] });
+  const result = compareScopes(before, after, [], [], CLARIFICATION);
+
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].kind, "moved");
+  assert.equal(result.items[0].section, "requirements");
+  assert.equal(result.items[0].afterSection, "inScope");
+  assert.equal(result.summary.some((line) => /0 item\(s\) added, 0 removed, 0 changed, 1 moved/i.test(line)), true);
+});
+
 test("compareScopes reports a changed problem statement", () => {
   const before = scope();
   const after = scope({ problemStatement: "Customers need clearer tracking." });
@@ -119,6 +136,133 @@ test("compareScopes reports a changed problem statement", () => {
   assert.equal(result.items.length, 1);
   assert.equal(result.items[0].section, "problemStatement");
   assert.equal(result.items[0].textChanged, true);
+});
+
+test("a proposed feature that remains proposed is not evidence that its finding was resolved", () => {
+  const question = "Should product filtering be included?";
+  const beforeItem: ScopeItem = {
+    text: "Product filtering by category and price.",
+    status: "proposed",
+    rationale: "The client asked to consider it later.",
+    sourceQuote: "We may add product filters later, but that decision is not made.",
+  };
+  const before = scope({
+    inScope: [beforeItem],
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const after = scope({
+    inScope: [{
+      ...beforeItem,
+      text: "Product filtering by category and price remains proposed.",
+    }],
+  });
+  const oldFinding = finding(
+    "unsupported-assumption",
+    "Product filtering is treated as confirmed although it remains proposed.",
+    "We may add product filters later, but that decision is not made.",
+  );
+
+  const result = compareScopes(
+    before,
+    after,
+    [oldFinding],
+    [],
+    { question, answer: "Include it for now.", confirmed: true },
+  );
+
+  assert.equal(result.questionResolved, true);
+  assert.equal(result.findings.resolved.length, 0);
+  assert.deepEqual(result.findings.unmatched, [oldFinding]);
+});
+
+test("a still-proposed feature blocks resolution even when the question is worded differently", () => {
+  const question = "Are catalog refinements needed?";
+  const before = scope({
+    inScope: [{
+      text: "Product filtering by category and price.",
+      status: "proposed",
+      rationale: "Not approved.",
+    }],
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const after = scope({
+    inScope: [{
+      text: "Product filtering remains proposed pending client approval.",
+      status: "proposed",
+      rationale: "Not approved.",
+    }],
+  });
+  const oldFinding = finding(
+    "unsupported-assumption",
+    "Product filtering is treated as confirmed although it remains proposed.",
+    "We may add product filters later, but that decision is not made.",
+  );
+
+  const result = compareScopes(
+    before,
+    after,
+    [oldFinding],
+    [],
+    { question, answer: "Review catalog refinements.", confirmed: true },
+  );
+
+  assert.equal(result.questionResolved, true);
+  assert.equal(result.findings.resolved.length, 0);
+  assert.deepEqual(result.findings.unmatched, [oldFinding]);
+});
+
+test("a confirmed clarification still resolves a finding when no provisional decision remains", () => {
+  const question = "What is the report delivery time?";
+  const before = scope({
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const after = scope({
+    requirements: [{
+      text: "The report is delivered every Monday at 8 AM.",
+      status: "confirmed",
+      sourceQuote: "every Monday at 8 AM",
+      sourceKind: "clarification",
+      clarificationId: "c1",
+    }],
+  });
+  const oldFinding = finding(
+    "missing-info",
+    "The report delivery time is undefined.",
+  );
+
+  const result = compareScopes(
+    before,
+    after,
+    [oldFinding],
+    [],
+    { question, answer: "Every Monday at 8 AM.", confirmed: true },
+  );
+
+  assert.equal(result.questionResolved, true);
+  assert.deepEqual(result.findings.resolved, [oldFinding]);
+});
+
+test("an unconfirmed clarification note does not resolve a finding even if the question disappears", () => {
+  const question = "What is the report delivery time?";
+  const before = scope({
+    openQuestions: [{ text: question, status: "unresolved" }],
+  });
+  const oldFinding = finding(
+    "missing-info",
+    "The report delivery time is undefined.",
+  );
+
+  const result = compareScopes(
+    before,
+    scope(),
+    [oldFinding],
+    [],
+    { question, answer: "We think Monday may work.", confirmed: false },
+  );
+
+  assert.equal(result.questionResolved, true);
+  assert.equal(result.findings.resolved.length, 0);
+  assert.deepEqual(result.findings.unmatched, [oldFinding]);
 });
 
 test("questionStillOpen matches the same question with different wording", () => {

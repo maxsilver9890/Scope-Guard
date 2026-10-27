@@ -1,7 +1,7 @@
 import { critiqueScope } from "./critique";
 import { generateScope, type GenerateOptions } from "./generate";
 import { similarity } from "./diff";
-import { enforceFindingProvenance, repairScopeProvenance } from "./provenance";
+import { enforceFindingProvenance, filterFindingsInconsistentWithScope, repairScopeProvenance } from "./provenance";
 import {
   scopeSchema,
   type Clarification,
@@ -169,7 +169,11 @@ export async function reconcileCritique(
   }
 
   const reviewed = await deps.critiqueScope(input, parsed.data, { clarifications });
-  const verifiedFindings = enforceFindingProvenance(reviewed, corpus).findings;
+  const verifiedFindings = filterFindingsInconsistentWithScope(
+    enforceFindingProvenance(reviewed, corpus).findings,
+    parsed.data,
+    corpus,
+  ).findings;
   // Unconfirmed notes are retained as context for review, but they are not
   // client assertions and cannot by themselves prove that a prior confirmed
   // commitment is false. Transcript evidence and confirmed notes remain

@@ -177,3 +177,136 @@ test("edited scope exports disclose that critique findings have not been revalid
   assert.match(content, /edited after analysis/i);
   assert.match(content, /have not been revalidated/i);
 });
+
+test("executive status counts count repeated requirement and acceptance representations once", () => {
+  const quote = "The site must keep working with the warehouse platform.";
+  const duplicate = { text: "Continue working with the warehouse platform.", status: "confirmed" as const, sourceQuote: quote };
+  const scope: Scope = {
+    problemStatement: "A store needs a reliable scope.",
+    inScope: [duplicate], outOfScope: [], assumptions: [], openQuestions: [],
+    requirements: [duplicate], acceptanceCriteria: [duplicate], clarifications: [],
+  };
+  const content = collectText(scopeToPdfDefinition(scope, []).content).join("\n");
+  assert.match(content, /records 1 confirmed, 0 inferred, 0 proposed, and 0 unresolved unique decisions/i);
+  assert.match(content, /Repeated representations of the same source-backed decision are counted once/i);
+});
+
+test("the same commitment in Requirements and Acceptance Criteria is counted once", () => {
+  const quote = "The store must keep working with StockPilot so staff do not update inventory twice.";
+  const requirement = {
+    text: "Continue working with StockPilot for stock management.",
+    status: "confirmed" as const,
+    sourceQuote: quote,
+  };
+  const acceptance = {
+    text: "Continue working with StockPilot for stock management in the new store.",
+    status: "confirmed" as const,
+    sourceQuote: quote,
+  };
+  const scope: Scope = {
+    problemStatement: "A store needs StockPilot to stay connected.",
+    inScope: [], outOfScope: [], assumptions: [], openQuestions: [],
+    requirements: [requirement], acceptanceCriteria: [acceptance], clarifications: [],
+  };
+  const content = collectText(scopeToPdfDefinition(scope, []).content).join("\n");
+
+  assert.match(content, /records 1 confirmed, 0 inferred, 0 proposed, and 0 unresolved unique decisions/i);
+  assert.match(content, /Continue working with StockPilot for stock management\./);
+  assert.match(content, /Continue working with StockPilot for stock management in the new store\./);
+});
+
+test("distinct commitments with similar wording remain separate in executive counts", () => {
+  const quote = "The store must keep working with StockPilot so staff do not update inventory twice.";
+  const scope: Scope = {
+    problemStatement: "A store needs StockPilot to stay connected.",
+    inScope: [], outOfScope: [], assumptions: [], openQuestions: [],
+    requirements: [
+      { text: "Continue working with StockPilot for stock management.", status: "confirmed", sourceQuote: quote },
+      { text: "Staff must not update inventory in two places.", status: "confirmed", sourceQuote: quote },
+    ],
+    acceptanceCriteria: [],
+    clarifications: [],
+  };
+  const content = collectText(scopeToPdfDefinition(scope, []).content).join("\n");
+
+  assert.match(content, /records 2 confirmed, 0 inferred, 0 proposed, and 0 unresolved unique decisions/i);
+});
+
+test("different commitment statuses are not silently merged by executive counts", () => {
+  const text = "Continue working with StockPilot for stock management.";
+  const quote = "The store must keep working with StockPilot so staff do not update inventory twice.";
+  const scope: Scope = {
+    problemStatement: "A store needs StockPilot to stay connected.",
+    inScope: [], outOfScope: [], assumptions: [], openQuestions: [],
+    requirements: [{ text, status: "confirmed", sourceQuote: quote }],
+    acceptanceCriteria: [{ text, status: "proposed", rationale: "Approval is pending." }],
+    clarifications: [],
+  };
+  const content = collectText(scopeToPdfDefinition(scope, []).content).join("\n");
+
+  assert.match(content, /records 1 confirmed, 0 inferred, 1 proposed, and 0 unresolved unique decisions/i);
+  assert.match(content, /Continue working with StockPilot for stock management\./);
+});
+
+test("section contents stay complete when executive counts are deduplicated", () => {
+  const quote = "The store must keep working with StockPilot so staff do not update inventory twice.";
+  const duplicate = {
+    text: "Continue working with StockPilot for stock management.",
+    status: "confirmed" as const,
+    sourceQuote: quote,
+  };
+  const distinct = {
+    text: "Show each order's current fulfilment status.",
+    status: "proposed" as const,
+    rationale: "The client has not approved this view yet.",
+  };
+  const scope: Scope = {
+    problemStatement: "A store needs a reliable scope.",
+    inScope: [], outOfScope: [], assumptions: [], openQuestions: [],
+    requirements: [duplicate, distinct],
+    acceptanceCriteria: [duplicate],
+    clarifications: [],
+  };
+  const content = collectText(scopeToPdfDefinition(scope, []).content).join("\n");
+
+  assert.match(content, /2 requirements/);
+  assert.match(content, /1 acceptance criteria/);
+  assert.match(content, /Continue working with StockPilot for stock management\./);
+  assert.match(content, /Show each order's current fulfilment status\./);
+  assert.match(content, /records 1 confirmed, 0 inferred, 1 proposed, and 0 unresolved unique decisions/i);
+});
+
+test("change summary distinguishes a section move from a new or resolved scope decision", () => {
+  const proposedFilter = {
+    text: "Product filtering remains proposed pending client approval.",
+    status: "proposed" as const,
+    rationale: "Not yet approved.",
+  };
+  const before: Scope = {
+    problemStatement: "A store needs product discovery.",
+    inScope: [], outOfScope: [], assumptions: [], openQuestions: [],
+    requirements: [proposedFilter], acceptanceCriteria: [], clarifications: [],
+  };
+  const after: Scope = {
+    ...before,
+    inScope: [proposedFilter],
+    requirements: [],
+  };
+  const comparison = {
+    items: [{
+      section: "requirements" as const, afterSection: "inScope" as const,
+      kind: "moved" as const, beforeText: proposedFilter.text, afterText: proposedFilter.text,
+      beforeStatus: "proposed" as const, afterStatus: "proposed" as const,
+      textChanged: false, statusChanged: false, provenanceChanged: false,
+    }],
+    findings: { resolved: [], remaining: [], changed: [], added: [], unmatched: [] },
+    questionResolved: false,
+    clarification: { question: "Which product filters are approved?", answer: "Still reviewing.", confirmed: false },
+    summary: ["0 item(s) added, 0 removed, 0 changed, 1 moved between sections without changing the decision."],
+  };
+  const content = collectText(scopeToPdfDefinition(after, [], comparison).content).join("\n");
+  assert.match(content, /Moved between sections/);
+  assert.match(content, /Requirements → In Scope/);
+  assert.doesNotMatch(content, /Resolved  Requirements: Product filtering/);
+  assert.match(content, /remains proposed pending client approval/);
+});

@@ -12,6 +12,13 @@ import {
   excludedButRequired,
   requiredButExcluded,
 } from "./fixtures/reconciliation-scenarios.ts";
+import {
+  GENUINE_TRAINING_GAP,
+  MISLEADING_TRAINING_FINDING,
+  TRAINING_REQUEST,
+  URBANNEST_TRANSCRIPT,
+  urbannestTrainingScope,
+} from "./fixtures/urbannest-scope.ts";
 
 async function loadTranscript(): Promise<string> {
   return readFile(new URL("../samples/northstar-dental-transcript.txt", import.meta.url), "utf8");
@@ -220,6 +227,32 @@ test("UrbanNest room categories are not confused with undecided product filters"
   assert.equal(result.reconciled, true);
   assert.equal(result.scope.openQuestions[0].status, "unresolved");
   assert.equal(result.scope.inScope[0].status, "confirmed");
+});
+
+test("UrbanNest training stays a supported proposal and its false unsupported finding is dropped", async () => {
+  const scope = urbannestTrainingScope();
+  const result = await reconcileCritique(
+    URBANNEST_TRANSCRIPT,
+    scope,
+    [MISLEADING_TRAINING_FINDING, GENUINE_TRAINING_GAP],
+    {},
+    {
+      generateScope: async () => scope,
+      critiqueScope: async () => [
+        MISLEADING_TRAINING_FINDING,
+        GENUINE_TRAINING_GAP,
+      ],
+    },
+  );
+
+  const training = result.scope.inScope[0];
+  assert.equal(result.reconciled, true);
+  assert.equal(training.status, "proposed");
+  assert.equal(training.sourceQuote, TRAINING_REQUEST);
+  assert.equal(training.sourceKind, "transcript");
+  assert.deepEqual(result.findings, [
+    { ...GENUINE_TRAINING_GAP, sourceKind: "transcript" },
+  ]);
 });
 
 test("an explicit exclusion conflicts with the same feature as a required deliverable", async () => {

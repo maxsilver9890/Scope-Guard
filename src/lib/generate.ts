@@ -43,8 +43,10 @@ Fidelity rules:
 - If the client says a feature is undecided, unresolved, or still under consideration, keep it in openQuestions; do not list it as an exclusion.
 - Do not treat an unstated feature as explicitly excluded.
 - Preserve direct client commitments even when they are qualitative (for example, providing course descriptions or testimonials); do not downgrade them merely because implementation details remain undecided.
+- Separate a confirmed business need from the unverified technical means of meeting it. A client may require continued use of a named system while API availability, integration feasibility, synchronization behavior, and technical acceptance criteria remain open. Keep the supported need confirmed, and keep technical details proposed or unresolved.
+- Separate a broad qualitative expectation (such as secure, reliable checkout) from guarantees, controls, and measurable service levels. Do not promise zero incidents, issue-free operation, or an unapproved security/reliability SLA. Keep only the expectation the source supports and ask about the missing boundary.
 - Do not treat a broad feature label (for example, "basic SEO") as a confirmed acceptance criterion unless the client agreed to an observable boundary. Keep the broad requirement at its supported status and ask about the missing boundary in openQuestions.
-- sourceQuote must be a short verbatim substring of the original input or a recorded clarification (roughly 4-40 words), never a paraphrase and never text from your own summary. Omit sourceQuote for proposed items.
+- sourceQuote must be a short verbatim substring of the original input or a recorded clarification (roughly 4-40 words), never a paraphrase and never text from your own summary. A directly mentioned proposed item may and should retain its quote; a proposal status does not mean that the client's request for review was absent.
 - problemStatement is a plain string: 1-3 sentences describing the underlying business problem without adding commitments.
 
 Every array must be present. Use an empty array when the input genuinely has nothing for that field.`;

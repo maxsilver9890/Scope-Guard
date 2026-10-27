@@ -1,5 +1,8 @@
 import { chatCompletion } from "./deepseek";
-import { enforceFindingProvenance } from "./provenance";
+import {
+  enforceFindingProvenance,
+  filterFindingsInconsistentWithScope,
+} from "./provenance";
 import {
   formatClarificationsForReview,
   formatScopeForReview,
@@ -26,6 +29,9 @@ Check these relationships explicitly:
 - Client access requirements versus authentication and authorization boundaries.
 - Budget or financial reporting versus the availability of financial data.
 - For every confirmed item, whether it adds a cadence, automation, numeric threshold, export format, or security guarantee that the quoted source does not state.
+- Distinguish a confirmed business need from unverified technical feasibility. Wanting a site to continue working with a named inventory system does not confirm API availability; an explicit request to avoid duplicate manual updates does support the business need.
+- A general expectation of security or reliability is not a promise of zero incidents or a measurable SLA. Identify undefined controls and acceptance boundaries without describing a supported qualitative need as an unsupported guarantee unless the scope actually adds one.
+- Check whether each finding's account of the scope matches the actual status-labelled items. Do not call directly quoted requests unsupported; distinguish “requested for proposed review” from “approved commitment.”
 
 Classification — use exactly one of these:
 - "ambiguity": a statement supports materially different interpretations.
@@ -198,5 +204,16 @@ ${formatScopeForReview(scope)}`;
     );
   }
 
-  return provenance.findings;
+  const consistent = filterFindingsInconsistentWithScope(
+    provenance.findings,
+    scope,
+    { transcript: rawInput, clarifications },
+  );
+  if (consistent.dropped > 0) {
+    console.warn(
+      `[critique] dropped ${consistent.dropped} finding(s) that misdescribed a provisional, source-backed item`,
+    );
+  }
+
+  return consistent.findings;
 }

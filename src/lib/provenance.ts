@@ -140,10 +140,12 @@ const DETAIL_PATTERNS = [
   /\b(?:pdf|excel|csv|xml|json)\b/gi,
   /\b\d+(?:\.\d+)?\s*(?:%|percent|seconds?|minutes?|hours?|days?|weeks?|months?)\b/gi,
   /\b(?:soc\s?2|iso\s?27001|gdpr|encrypted at rest)\b/gi,
+  /\b(?:sync(?:s|ed|ing)?|synchroni[sz](?:e|es|ed|ing|ation))\b/gi,
+  /\b(?:without (?:any )?(?:customer|checkout) (?:issues|problems)|zero (?:incidents|failures|errors)|never fail(?:s|ure)?|100\s*%\s*(?:uptime|reliability)|guaranteed (?:secure|reliable))\b/gi,
 ];
 
 const TENTATIVE_PATTERN =
-  /\b(?:maybe|perhaps|might|could|i think|i'?d have to|not sure|would love|would be useful|would be nice|i'?d (?:also )?like|we would like|if it'?s easy|let'?s say yes|we can always)\b|\b(?:i would like)\b|\b(?:i'?d|i would) like\b.{0,100}\b(?:propos\w*|consider\w*|recommend\w*|option)\b/i;
+  /\b(?:maybe|perhaps|might|could|i think|i'?d have to|not sure|would love|would (?:also )?be useful|would be nice|i'?d (?:also )?like|we would like|if it'?s easy|let'?s say yes|we can always)\b|\b(?:i would like)\b|\b(?:i'?d|i would) like\b.{0,100}\b(?:propos\w*|consider\w*|recommend\w*|option)\b/i;
 
 /**
  * If the quote sits inside a client turn that also contains a caveat, treat
@@ -163,6 +165,37 @@ export function quoteContextIsTentative(
     .filter((line) => normalizeQuote(line).includes(normalizedQuote));
 
   return matchingLines.some((line) => TENTATIVE_PATTERN.test(line));
+}
+
+const PROPOSED_SCOPE_REVIEW_PATTERN =
+  /include (?:it )?in (?:the )?proposed scope/i;
+
+/**
+ * A client can explicitly ask for a requested feature to be considered in the
+ * proposed scope. That supports the request while still leaving approval to
+ * the client, so the item must stay proposed rather than being reported as
+ * unsupported or silently promoted.
+ */
+export function requestedForProposedReview(
+  transcript: string,
+  quote: string,
+): boolean {
+  const normalizedQuote = normalizeQuote(quote);
+  if (!normalizedQuote) {
+    return false;
+  }
+
+  if (PROPOSED_SCOPE_REVIEW_PATTERN.test(normalizedQuote)) {
+    return true;
+  }
+
+  return transcript.split(/\r?\n/).some((line) => {
+    const normalizedLine = normalizeQuote(line);
+    return (
+      normalizedLine.includes(normalizedQuote) &&
+      PROPOSED_SCOPE_REVIEW_PATTERN.test(normalizedLine)
+    );
+  });
 }
 
 /**
@@ -206,6 +239,21 @@ function withOrigin(item: ScopeItem, origin: QuoteOrigin): ScopeItem {
   };
 }
 
+function provisionalWithEvidence(
+  item: ScopeItem,
+  origin: QuoteOrigin,
+  rationale: string,
+): ScopeItem {
+  return {
+    text: item.text,
+    status: "proposed",
+    rationale,
+    ...(item.sourceQuote ? { sourceQuote: item.sourceQuote } : {}),
+    sourceKind: origin.kind,
+    ...(origin.clarificationId ? { clarificationId: origin.clarificationId } : {}),
+  };
+}
+
 function repairItem(
   item: ScopeItem,
   corpus: SourceCorpus,
@@ -220,6 +268,9 @@ function repairItem(
     : undefined;
   const needsSupport =
     item.status === "confirmed" || item.status === "inferred";
+  const proposedReviewRequested = Boolean(
+    quote && requestedForProposedReview(corpus.transcript, quote),
+  );
 
   // An inference without a stated rationale cannot be reviewed; treat it as a
   // proposal that still needs client approval.
@@ -270,11 +321,11 @@ function repairItem(
     );
     if (unsupportedDetail) {
       return {
-        item: {
-          text: item.text,
-          status: "proposed",
-          rationale: `Proposed because "${unsupportedDetail}" is not stated in the source.`,
-        },
+        item: provisionalWithEvidence(
+          item,
+          origin,
+          `Proposed because the specific detail “${unsupportedDetail}” is not stated in the source; the broader need remains supported by the quoted source.`,
+        ),
         downgraded: true,
       };
     }
@@ -289,17 +340,27 @@ function repairItem(
       quoteContextIsTentative(corpus.transcript, quote))
   ) {
     return {
-      item: {
-        text: item.text,
-        status: "proposed",
-        rationale:
-          "The quoted source is tentative, not a confirmed commitment; needs client confirmation.",
-      },
+      item: provisionalWithEvidence(
+        item,
+        origin,
+        proposedReviewRequested
+          ? "The client asked to include this in the proposed scope for review; it still needs approval as a commitment."
+          : "The quoted source is tentative, not a confirmed commitment; needs client confirmation.",
+      ),
       downgraded: true,
     };
   }
 
   if (origin) {
+    if (item.status === "proposed" && proposedReviewRequested) {
+      return {
+        item: {
+          ...withOrigin(item, origin),
+          rationale: "The client asked to include this in the proposed scope for review; it still needs approval as a commitment.",
+        },
+        downgraded: false,
+      };
+    }
     return { item: withOrigin(item, origin), downgraded: false };
   }
 
@@ -374,4 +435,124 @@ export function repairScopeProvenance(
     },
     downgraded,
   };
+}
+
+const CLAIM_STOPWORDS = new Set([
+  "the", "and", "for", "with", "that", "this", "from", "into", "are", "was",
+  "were", "will", "must", "should", "can", "not", "but", "have", "has", "all",
+  "any", "each", "their", "them", "they", "you", "your", "our", "its", "it",
+  "a", "an", "to", "of", "in", "on", "at", "as", "by", "or", "be", "is", "we",
+  "us", "i", "if", "may", "per", "than", "then", "there", "these", "those",
+  "scope", "source", "client", "item", "listed", "marked", "treated",
+]);
+
+function claimTokens(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 1 && !CLAIM_STOPWORDS.has(token)),
+  );
+}
+
+function tokenSimilarity(a: string, b: string): number {
+  const left = claimTokens(a);
+  const right = claimTokens(b);
+  if (left.size === 0 || right.size === 0) {
+    return normalizeQuote(a).toLowerCase() === normalizeQuote(b).toLowerCase()
+      ? 1
+      : 0;
+  }
+
+  let shared = 0;
+  for (const token of left) {
+    if (right.has(token)) {
+      shared += 1;
+    }
+  }
+  return shared / (left.size + right.size - shared);
+}
+
+const CLAIMS_CONFIRMED_PATTERN =
+  /\b(?:is|are|was|were|marked|treated|recorded|presented|listed|shown|shows?|keeps?|remains?)\b[^.!?]{0,32}\b(?:confirmed|approved|agreed|committed|guaranteed)\b/i;
+const CLAIMS_UNSUPPORTED_PATTERN =
+  /\b(?:unsupported|not supported|no (?:source|transcript) (?:support|evidence)|absent from the source|not (?:stated|mentioned|requested|included) in (?:the )?(?:source|transcript)|never (?:requested|mentioned|included|stated))\b/i;
+
+/**
+ * Findings are generated by a model, so they can still misdescribe the
+ * document they are reviewing. Drop only the narrow case where an
+ * `unsupported-assumption` finding calls a provisional, source-backed
+ * proposal an approved commitment or claims the client never requested it.
+ * Genuine gaps about a provisional item (for example, an undefined delivery
+ * format) are classified as missing information and pass through untouched.
+ */
+export function filterFindingsInconsistentWithScope(
+  findings: Finding[],
+  scope: Pick<Scope, CommitmentSection>,
+  source: string | SourceCorpus,
+): { findings: Finding[]; dropped: number } {
+  const corpus = toSourceCorpus(source);
+  const sections: CommitmentSection[] = [
+    "inScope",
+    "outOfScope",
+    "requirements",
+    "acceptanceCriteria",
+  ];
+  const decisions = sections.flatMap((section) => scope[section]);
+
+  const kept: Finding[] = [];
+  let dropped = 0;
+
+  for (const finding of findings) {
+    if (finding.type !== "unsupported-assumption") {
+      kept.push(finding);
+      continue;
+    }
+
+    const related = decisions.filter((item) => {
+      const scores = [
+        tokenSimilarity(item.text, finding.description),
+        tokenSimilarity(item.text, finding.sourceSnippet),
+      ];
+      if (item.sourceQuote) {
+        scores.push(tokenSimilarity(item.sourceQuote, finding.sourceSnippet));
+      }
+      return Math.max(...scores) >= 0.2;
+    });
+    const confirmed = related.filter((item) => item.status === "confirmed");
+    const provisional = related.filter(
+      (item) => item.status === "proposed" || item.status === "inferred",
+    );
+
+    const sourceBackedProposal = provisional.some((item) => {
+      if (!item.sourceQuote) {
+        return false;
+      }
+      return (
+        findQuoteOrigin(item.sourceQuote, corpus) !== undefined &&
+        (normalizeQuote(item.sourceQuote) ===
+          normalizeQuote(finding.sourceSnippet) ||
+          tokenSimilarity(item.sourceQuote, finding.sourceSnippet) >= 0.6)
+      );
+    });
+
+    const misstatesStatus =
+      CLAIMS_CONFIRMED_PATTERN.test(finding.description) &&
+      provisional.length > 0 &&
+      confirmed.length === 0;
+    const deniesSourcedProposal =
+      CLAIMS_UNSUPPORTED_PATTERN.test(finding.description) &&
+      sourceBackedProposal &&
+      confirmed.length === 0;
+
+    if (misstatesStatus || deniesSourcedProposal) {
+      dropped += 1;
+      continue;
+    }
+
+    kept.push(finding);
+  }
+
+  return { findings: kept, dropped };
 }

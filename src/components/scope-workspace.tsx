@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { downloadScopePdf } from "@/lib/pdf-export";
+import { distinctDecisionStatusCounts } from "@/lib/commitments";
 import {
   analysisRequestBody,
   analysisResultsReducer,
@@ -112,32 +113,6 @@ const STATUS_STYLES: Record<
 };
 
 const FALLBACK_BADGE = "border-line bg-canvas text-muted";
-
-const ITEM_SECTIONS = [
-  "inScope",
-  "outOfScope",
-  "assumptions",
-  "openQuestions",
-  "requirements",
-  "acceptanceCriteria",
-] as const;
-
-function countStatuses(scope: Scope) {
-  const counts = {
-    confirmed: 0,
-    inferred: 0,
-    proposed: 0,
-    unresolved: 0,
-  };
-
-  for (const section of ITEM_SECTIONS) {
-    for (const item of scope[section]) {
-      counts[item.status] += 1;
-    }
-  }
-
-  return counts;
-}
 
 const TOOLBAR_BUTTON =
   "inline-flex h-9 items-center gap-2 rounded-xl border border-line/80 bg-white/70 px-3 text-[11px] font-medium text-forest transition-all duration-200 hover:border-accent/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
@@ -711,17 +686,25 @@ function ComparisonFindingRow({
 
 function ComparisonItemRow({ change }: { change: ItemChange }) {
   const section = SECTION_LABELS[change.section];
+  const destination = change.afterSection
+    ? SECTION_LABELS[change.afterSection]
+    : undefined;
   const kindLabel =
     change.kind === "added"
       ? "Added"
       : change.kind === "removed"
         ? "Removed"
-        : "Changed";
+        : change.kind === "moved"
+          ? "Moved"
+          : "Changed";
 
   return (
     <li className="rounded-md border border-line bg-surface px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-2 text-[9px] uppercase tracking-[0.14em]">
-        <span className="text-muted">{section}</span>
+        <span className="text-muted">
+          {section}
+          {destination && destination !== section ? ` → ${destination}` : ""}
+        </span>
         <span className="text-muted/50" aria-hidden="true">
           ·
         </span>
@@ -777,9 +760,16 @@ function ComparisonItemRow({ change }: { change: ItemChange }) {
       ) : (
         <div className="mt-2">
           <p className="text-[12.5px] leading-5 text-ink/85">
-            {change.kind === "added" ? change.afterText : change.beforeText}
+            {change.kind === "removed"
+              ? change.beforeText
+              : (change.afterText ?? change.beforeText)}
           </p>
           {change.kind === "added" && change.afterStatus ? (
+            <div className="mt-1.5">
+              <StatusBadge status={change.afterStatus} />
+            </div>
+          ) : null}
+          {change.kind === "moved" && change.afterStatus ? (
             <div className="mt-1.5">
               <StatusBadge status={change.afterStatus} />
             </div>
@@ -1093,7 +1083,7 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
   const hasResults =
     scope !== null && editedScope !== null && findings !== null;
   const statusCounts =
-    hasResults && editedScope ? countStatuses(editedScope) : null;
+    hasResults && editedScope ? distinctDecisionStatusCounts(editedScope) : null;
   const pdfPreflight = editedScope
     ? getPdfExportPreflight(editedScope)
     : { requiresConfirmation: false, count: 0, unansweredCount: 0, tentativeCount: 0, confirmedButUnresolvedCount: 0 };

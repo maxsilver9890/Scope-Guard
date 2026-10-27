@@ -20,6 +20,8 @@ function provenanceLabel(item: {
 /**
  * Status-grouped rendering for model context. Confirmations and provisional
  * items are deliberately separated so proposals are never read as agreements.
+ * Verified quotes are included for provisional items too: without them the
+ * critique cannot tell a source-supported proposal from an invention.
  */
 export function formatScopeForReview(scope: ReviewableScope): string {
   const confirmed: string[] = [];
@@ -28,9 +30,12 @@ export function formatScopeForReview(scope: ReviewableScope): string {
   for (const [label, key] of SECTIONS) {
     for (const item of scope[key]) {
       const rationale = item.rationale ? ` (rationale: ${item.rationale})` : "";
+      const evidence = item.sourceQuote
+        ? ` (source quote: “${item.sourceQuote}”)`
+        : "";
       const line = `[${label} · ${item.status}${provenanceLabel(
         item,
-      )}] ${item.text}${rationale}`;
+      )}] ${item.text}${rationale}${evidence}`;
       if (item.status === "confirmed") {
         confirmed.push(line);
       } else {

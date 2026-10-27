@@ -3,18 +3,27 @@ import { test } from "node:test";
 
 import {
   enforceFindingProvenance,
+  filterFindingsInconsistentWithScope,
   findUnsupportedDetail,
   isQuoteInSource,
 normalizeQuote,
   quoteContextIsTentative,
   repairScopeProvenance,
 } from "../src/lib/provenance.ts";
+import { formatScopeForReview } from "../src/lib/scope-format.ts";
 import type {
   CommitmentStatus,
   Finding,
   Scope,
   ScopeItem,
 } from "../src/lib/schema.ts";
+import {
+  GENUINE_TRAINING_GAP,
+  MISLEADING_TRAINING_FINDING,
+  TRAINING_REQUEST,
+  URBANNEST_TRANSCRIPT,
+  urbannestTrainingScope,
+} from "./fixtures/urbannest-scope.ts";
 
 const SOURCE = `We need a dashboard for the sales team.
 Budget too, if it's easy. The team keeps asking for one place to look.`;
@@ -156,6 +165,156 @@ test("a firm directly requested feature remains confirmed", () => {
   const result = repairScopeProvenance(scope, source);
   assert.equal(result.downgraded, 0);
   assert.equal(result.scope.requirements[0].status, "confirmed");
+});
+
+test("a confirmed StockPilot business need stays distinct from unverified API and synchronization details", () => {
+  const source = "The new store must continue working with StockPilot because our team relies on it to manage stock. We do not want staff manually updating inventory in two places. We believe it has an API, but we have not spoken to its technical team yet.";
+  const scope = scopeWith({
+    inScope: [item("Continue working with StockPilot for inventory management", "confirmed", {
+      sourceQuote: "The new store must continue working with StockPilot because our team relies on it to manage stock.",
+    })],
+    requirements: [item("Inventory data syncs with StockPilot to prevent manual updates in two places", "confirmed", {
+      sourceQuote: "The new store must continue working with StockPilot because our team relies on it to manage stock. We do not want staff manually updating inventory in two places.",
+    })],
+    acceptanceCriteria: [item("Inventory data syncs with StockPilot to prevent manual updates in two places", "confirmed", {
+      sourceQuote: "The new store must continue working with StockPilot because our team relies on it to manage stock. We do not want staff manually updating inventory in two places.",
+    })],
+    assumptions: [item("StockPilot has an API available for integration", "inferred", {
+      rationale: "The client believes an API exists but has not checked with the technical team.",
+      sourceQuote: "We believe it has an API, but we have not spoken to its technical team yet.",
+    })],
+    openQuestions: [{ text: "Can StockPilot support the required integration, and what synchronization behavior is feasible?", status: "unresolved" }],
+  });
+
+  const result = repairScopeProvenance(scope, source).scope;
+  assert.equal(result.inScope[0].status, "confirmed");
+  assert.equal(result.assumptions[0].status, "inferred");
+  assert.ok(result.requirements.every((entry) => entry.status === "proposed"));
+  assert.ok(result.acceptanceCriteria.every((entry) => entry.status === "proposed"));
+  assert.ok(result.openQuestions.some((entry) => /synchronization behavior/i.test(entry.text)));
+});
+
+test("explicit security and reliability expectations do not become zero-issue guarantees", () => {
+  const source = "We expect checkout to be secure and reliable. We do not want customers to have problems during checkout.";
+  const scope = scopeWith({
+    requirements: [
+      item("Secure and reliable checkout experience", "confirmed", {
+        sourceQuote: "We expect checkout to be secure and reliable.",
+      }),
+      item("Secure and reliable checkout without customer issues", "confirmed", {
+        sourceQuote: source,
+      }),
+    ],
+    openQuestions: [{ text: "Which security controls and reliability criteria should apply to checkout?", status: "unresolved" }],
+  });
+  const result = repairScopeProvenance(scope, source).scope;
+  assert.equal(result.requirements[0].status, "confirmed");
+  assert.equal(result.requirements[1].status, "proposed");
+  assert.match(result.requirements[1].rationale ?? "", /specific detail.*not stated/i);
+  assert.equal(result.requirements[1].sourceQuote, source);
+  assert.ok(result.openQuestions.length > 0);
+});
+
+test("tentative filtering and analytics remain unapproved while retaining direct evidence", () => {
+  const source = "It would be useful if shoppers could filter by category, price, and colour. It would also be useful to track product views and completed purchases.";
+  const scope = scopeWith({
+    inScope: [
+      item("Product filters by category, price, and colour", "confirmed", { sourceQuote: "It would be useful if shoppers could filter by category, price, and colour." }),
+      item("Track product views and completed purchases for analytics", "confirmed", { sourceQuote: "It would also be useful to track product views and completed purchases." }),
+    ],
+  });
+  const result = repairScopeProvenance(scope, source).scope;
+  assert.deepEqual(result.inScope.map((entry) => entry.status), ["proposed", "proposed"]);
+  assert.deepEqual(result.inScope.map((entry) => entry.sourceQuote), [
+    "It would be useful if shoppers could filter by category, price, and colour.",
+    "It would also be useful to track product views and completed purchases.",
+  ]);
+});
+
+test("training requested for proposed-scope review retains its quote and accurate rationale", () => {
+  const source = "I'd also like a training session so our team can manage products. Let's include it in the proposed scope so we can review it.";
+  const quote = "I'd also like a training session so our team can manage products. Let's include it in the proposed scope so we can review it.";
+  const scope = scopeWith({
+    inScope: [item("Training session for staff on product management", "confirmed", { sourceQuote: quote })],
+  });
+  const result = repairScopeProvenance(scope, source).scope.inScope[0];
+  assert.equal(result.status, "proposed");
+  assert.equal(result.sourceQuote, quote);
+  assert.match(result.rationale ?? "", /include this in the proposed scope for review/i);
+});
+
+test("UrbanNest training provenance is preserved and visible to the critique", () => {
+  const repaired = repairScopeProvenance(
+    urbannestTrainingScope(),
+    URBANNEST_TRANSCRIPT,
+  );
+  const training = repaired.scope.inScope[0];
+
+  assert.equal(training.status, "proposed");
+  assert.equal(training.sourceQuote, TRAINING_REQUEST);
+  assert.equal(training.sourceKind, "transcript");
+  assert.match(training.rationale ?? "", /proposed scope for review/i);
+  assert.doesNotMatch(training.rationale ?? "", /unsupported/i);
+
+  const reviewContext = formatScopeForReview(repaired.scope);
+  assert.match(reviewContext, /In Scope · proposed/);
+  assert.ok(reviewContext.includes(TRAINING_REQUEST));
+
+  const alreadyProposed = scopeWith({
+    inScope: [item("Staff training for product management", "proposed", {
+      rationale: "Needs client approval.",
+      sourceQuote: TRAINING_REQUEST,
+    })],
+  });
+  const stable = repairScopeProvenance(
+    alreadyProposed,
+    URBANNEST_TRANSCRIPT,
+  ).scope.inScope[0];
+  assert.equal(stable.status, "proposed");
+  assert.equal(stable.sourceQuote, TRAINING_REQUEST);
+});
+
+test("a sourced training proposal is not misreported as unsupported", () => {
+  const scope = repairScopeProvenance(
+    urbannestTrainingScope(),
+    URBANNEST_TRANSCRIPT,
+  ).scope;
+
+  const result = filterFindingsInconsistentWithScope(
+    [MISLEADING_TRAINING_FINDING, GENUINE_TRAINING_GAP],
+    scope,
+    URBANNEST_TRANSCRIPT,
+  );
+
+  assert.equal(result.dropped, 1);
+  assert.deepEqual(result.findings, [GENUINE_TRAINING_GAP]);
+});
+
+test("a contradiction against a confirmed commitment is not suppressed by the scope-consistency filter", () => {
+  const source = "The UrbanNest launch must include online appointment booking.";
+  const confirmed = scopeWith({
+    inScope: [{
+      text: "Online appointment booking is confirmed for launch.",
+      status: "confirmed",
+      sourceQuote: source,
+    }],
+  });
+  const finding: Finding = {
+    type: "unsupported-assumption",
+    description:
+      "Online appointment booking is treated as confirmed although the source records a conflict with the launch exclusion.",
+    whyItMatters: "The conflict must be resolved before implementation.",
+    sourceSnippet: source,
+  };
+
+  const result = filterFindingsInconsistentWithScope(
+    [finding],
+    confirmed,
+    source,
+  );
+
+  assert.equal(result.dropped, 0);
+  assert.deepEqual(result.findings, [finding]);
 });
 
 test("repairScopeProvenance marks unsupported exclusions as proposed", () => {

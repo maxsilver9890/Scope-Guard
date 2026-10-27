@@ -1,4 +1,5 @@
 import type { TDocumentDefinitions, Content } from "pdfmake/interfaces";
+import { distinctDecisionStatusCounts } from "./commitments";
 import { questionStillOpen, type ScopeComparison } from "./diff";
 import type { Clarification, CommitmentStatus, Finding, Scope, ScopeItem } from "./schema";
 
@@ -69,7 +70,7 @@ function changeContent(comparison: ScopeComparison): Content[] {
     ...comparison.findings.changed.map((f) => ({ label: "Changed or reworded", value: `${f.before.description} → ${f.after.description}` })),
     ...comparison.findings.added.map((f) => ({ label: "New", value: f.description })),
     ...comparison.findings.unmatched.map((f) => ({ label: "Not re-reported", value: f.description })),
-    ...comparison.items.map((item) => ({ label: item.kind === "added" ? "New" : item.kind === "removed" ? "Resolved" : "Changed or reworded", value: `${sectionNames[item.section] ?? item.section}: ${item.beforeText ?? ""}${item.beforeText && item.afterText ? " → " : ""}${item.afterText ?? ""}` })),
+    ...comparison.items.map((item) => ({ label: item.kind === "added" ? "New" : item.kind === "removed" ? "Removed" : item.kind === "moved" ? "Moved between sections" : "Changed", value: `${sectionNames[item.section] ?? item.section}${item.afterSection ? ` → ${sectionNames[item.afterSection] ?? item.afterSection}` : ""}: ${item.beforeText ?? ""}${item.beforeText && item.afterText ? " → " : ""}${item.afterText ?? ""}` })),
   ];
   if (!changes.length) result.push(text("No differences were recorded."));
   for (const entry of changes) result.push({ text: [{ text: `${entry.label}  `, bold: true, color: "#286486" }, entry.value], fontSize: 8.7, margin: [0, 3, 0, 3], lineHeight: 1.2 });
@@ -122,13 +123,10 @@ export function scopeToPdfDefinition(scope: Scope, findings: Finding[], comparis
   const coverTitle = coverTitleLayout(title);
   const sections: { name: string; id: string; content: Content[] }[] = [];
   const add = (name: string, id: string, content: Content[]) => sections.push({ name, id, content });
-  const statusCounts = { confirmed: 0, inferred: 0, proposed: 0, unresolved: 0 };
-  for (const key of ["inScope", "outOfScope", "assumptions", "openQuestions", "requirements", "acceptanceCriteria"] as const) {
-    for (const item of scope[key]) statusCounts[item.status] += 1;
-  }
+  const statusCounts = distinctDecisionStatusCounts(scope);
   add("Executive Summary", "executive-summary", [
     ...(editedAfterReview ? [{ text: "Review status: this scope was edited after analysis. The potential delivery risks below refer to the earlier analyzed version and have not been revalidated against these edits.", fontSize: 8.5, bold: true, color: "#95631b", margin: [0, 0, 0, 8] } as Content] : []),
-    text(`This scope specification records ${statusCounts.confirmed} confirmed, ${statusCounts.inferred} inferred, ${statusCounts.proposed} proposed, and ${statusCounts.unresolved} unresolved items across the project scope and requirements.`),
+    text(`This scope specification records ${statusCounts.confirmed} confirmed, ${statusCounts.inferred} inferred, ${statusCounts.proposed} proposed, and ${statusCounts.unresolved} unresolved unique decisions. Repeated representations of the same source-backed decision are counted once.`),
   ]);
   add("Problem Statement", "problem-statement", [text(scope.problemStatement)]);
   add("Scope Overview", "scope-overview", [text(`${scope.inScope.length} in-scope items · ${scope.outOfScope.length} exclusions · ${scope.assumptions.length} assumptions · ${scope.requirements.length} requirements · ${scope.acceptanceCriteria.length} acceptance criteria · ${scope.openQuestions.length} open questions.`)]);

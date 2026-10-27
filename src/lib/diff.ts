@@ -15,10 +15,12 @@ export type ComparisonSection =
   | "requirements"
   | "acceptanceCriteria";
 
-export type ItemChangeKind = "added" | "removed" | "changed";
+export type ItemChangeKind = "added" | "removed" | "changed" | "moved";
 
 export type ItemChange = {
   section: ComparisonSection;
+  /** Destination section when an existing decision changes section. */
+  afterSection?: ComparisonSection;
   kind: ItemChangeKind;
   beforeText?: string;
   afterText?: string;
@@ -157,6 +159,29 @@ function itemMatchIndex(
   return bestScore >= 0.55 ? bestIndex : -1;
 }
 
+/**
+ * Cross-section moves must be much stronger than same-section rewordings.
+ * A requirement and an acceptance criterion can discuss adjacent ideas with
+ * shared vocabulary; treating those as one moved item would hide a real
+ * removal or addition.
+ */
+function strongItemMatch(before: ScopeItem, candidate: ScopeItem): boolean {
+  if (normalizeQuote(before.text) === normalizeQuote(candidate.text)) {
+    return true;
+  }
+
+  if (
+    before.sourceQuote &&
+    candidate.sourceQuote &&
+    normalizeQuote(before.sourceQuote) === normalizeQuote(candidate.sourceQuote) &&
+    similarity(before.text, candidate.text) >= 0.3
+  ) {
+    return true;
+  }
+
+  return similarity(before.text, candidate.text) >= 0.75;
+}
+
 function changeFromPair(
   section: Exclude<ComparisonSection, "problemStatement">,
   before: ScopeItem,
@@ -195,18 +220,88 @@ export function questionStillOpen(scope: Scope, question: string): boolean {
   );
 }
 
-export function relatedToQuestion(finding: Finding, question: string): boolean {
+export function relatedTextToQuestion(text: string, question: string): boolean {
   const questionTokens = tokens(question);
   if (questionTokens.length === 0) {
     return false;
   }
 
-  const findingTokens = new Set(
-    tokens(`${finding.description} ${finding.sourceSnippet} ${finding.whyItMatters}`),
-  );
-  const overlap = questionTokens.filter((token) => findingTokens.has(token)).length;
+  const textTokens = new Set(tokens(text));
+  const overlap = questionTokens.filter((token) => textTokens.has(token)).length;
 
   return overlap / questionTokens.length >= 0.34;
+}
+
+export function relatedToQuestion(finding: Finding, question: string): boolean {
+  return relatedTextToQuestion(
+    `${finding.description} ${finding.sourceSnippet} ${finding.whyItMatters}`,
+    question,
+  );
+}
+
+/**
+ * A related proposal or inference that is still present means the underlying
+ * decision has not been approved yet, even if the open question was removed.
+ */
+function provisionalDecisionStillRepresentsQuestion(
+  scope: Scope,
+  question: string,
+): boolean {
+  const questionTokens = tokens(question);
+  if (questionTokens.length === 0) {
+    return false;
+  }
+
+  return (
+    ["inScope", "outOfScope", "requirements", "acceptanceCriteria"] as const
+  ).some((section) =>
+    scope[section].some((item) => {
+      if (item.status !== "proposed" && item.status !== "inferred") {
+        return false;
+      }
+      const itemTokens = new Set(
+        tokens(`${item.text} ${item.sourceQuote ?? ""}`),
+      );
+      const overlap = questionTokens.filter((token) =>
+        itemTokens.has(token),
+      ).length;
+      return overlap / questionTokens.length >= 0.5;
+    }),
+  );
+}
+
+/**
+ * The selected question can be worded differently from the finding. If a
+ * proposal describing the same feature is still present, the issue is not
+ * resolved just because the open question disappeared.
+ */
+function provisionalDecisionStillRepresentsFinding(
+  scope: Scope,
+  finding: Finding,
+): boolean {
+  const findingTokens = new Set(
+    tokens(`${finding.description} ${finding.sourceSnippet}`),
+  );
+
+  return (
+    ["inScope", "outOfScope", "requirements", "acceptanceCriteria"] as const
+  ).some((section) =>
+    scope[section].some((item) => {
+      if (item.status !== "proposed" && item.status !== "inferred") {
+        return false;
+      }
+      const itemTokens = new Set(
+        tokens(`${item.text} ${item.sourceQuote ?? ""}`),
+      );
+      let shared = 0;
+      for (const token of findingTokens) {
+        if (itemTokens.has(token)) {
+          shared += 1;
+        }
+      }
+      return shared >= 2;
+    }),
+  );
 }
 
 function findingKey(finding: Finding): string {
@@ -216,14 +311,20 @@ function findingKey(finding: Finding): string {
 function compareFindings(
   before: Finding[],
   after: Finding[],
+  afterScope: Scope,
   questionResolved: boolean,
   question: string,
+  clarificationConfirmed: boolean,
 ): FindingsComparison {
   const used = new Set<number>();
   const remaining: Finding[] = [];
   const changed: FindingChange[] = [];
   const resolved: Finding[] = [];
   const unmatched: Finding[] = [];
+  const decisionStillProvisional = provisionalDecisionStillRepresentsQuestion(
+    afterScope,
+    question,
+  );
 
   for (const oldFinding of before) {
     const exactIndex = after.findIndex(
@@ -260,7 +361,13 @@ function compareFindings(
       continue;
     }
 
-    if (questionResolved && relatedToQuestion(oldFinding, question)) {
+    if (
+      questionResolved &&
+      clarificationConfirmed &&
+      !decisionStillProvisional &&
+      !provisionalDecisionStillRepresentsFinding(afterScope, oldFinding) &&
+      relatedToQuestion(oldFinding, question)
+    ) {
       resolved.push(oldFinding);
     } else {
       unmatched.push(oldFinding);
@@ -315,6 +422,7 @@ export function compareScopes(
   clarification: { question: string; answer: string; confirmed: boolean },
 ): ScopeComparison {
   const items: ItemChange[] = [];
+  const matchedAfter = new Set<string>();
 
   if (
     normalizeQuote(before.problemStatement) !==
@@ -335,10 +443,14 @@ export function compareScopes(
     const used = new Set<number>();
 
     for (const oldItem of before[section]) {
-      const matchIndex = itemMatchIndex(oldItem, after[section], used);
+      const availableSameSection = after[section].map((item, index) =>
+        matchedAfter.has(`${section}:${index}`) ? { ...item, text: "" } : item,
+      );
+      const matchIndex = itemMatchIndex(oldItem, availableSameSection, used);
 
       if (matchIndex >= 0) {
         used.add(matchIndex);
+        matchedAfter.add(`${section}:${matchIndex}`);
         const change = changeFromPair(
           section,
           oldItem,
@@ -348,24 +460,92 @@ export function compareScopes(
           items.push(change);
         }
       } else {
-        items.push({
-          section,
-          kind: "removed",
-          beforeText: oldItem.text,
-          beforeStatus: oldItem.status,
-          beforeRationale: oldItem.rationale,
-          beforeSourceKind: oldItem.sourceKind,
-          textChanged: true,
-          statusChanged: false,
-          provenanceChanged: false,
-        });
+        let movedMatch:
+          | {
+              section: (typeof ITEM_SECTIONS)[number];
+              index: number;
+              alreadyRepresented: boolean;
+            }
+          | undefined;
+        for (const destination of ITEM_SECTIONS) {
+          if (destination === section) continue;
+
+          const openIndex = after[destination].findIndex(
+            (candidate, index) =>
+              !matchedAfter.has(`${destination}:${index}`) &&
+              strongItemMatch(oldItem, candidate),
+          );
+          if (openIndex >= 0) {
+            movedMatch = {
+              section: destination,
+              index: openIndex,
+              alreadyRepresented: false,
+            };
+            break;
+          }
+
+          // A duplicate representation may already have matched in its own
+          // section. It still means the underlying decision was retained.
+          const representedIndex = after[destination].findIndex(
+            (candidate, index) =>
+              matchedAfter.has(`${destination}:${index}`) &&
+              strongItemMatch(oldItem, candidate),
+          );
+          if (representedIndex >= 0) {
+            movedMatch = {
+              section: destination,
+              index: representedIndex,
+              alreadyRepresented: true,
+            };
+            break;
+          }
+        }
+
+        if (movedMatch) {
+          const afterItem = after[movedMatch.section][movedMatch.index];
+          if (!movedMatch.alreadyRepresented) {
+            matchedAfter.add(`${movedMatch.section}:${movedMatch.index}`);
+          }
+          const statusChanged = oldItem.status !== afterItem.status;
+          const textChanged = normalizeQuote(oldItem.text) !== normalizeQuote(afterItem.text);
+          const provenanceChanged = oldItem.sourceKind !== afterItem.sourceKind;
+          items.push({
+            section,
+            afterSection: movedMatch.section,
+            kind: statusChanged || textChanged || provenanceChanged ? "changed" : "moved",
+            beforeText: oldItem.text,
+            afterText: afterItem.text,
+            beforeStatus: oldItem.status,
+            afterStatus: afterItem.status,
+            beforeRationale: oldItem.rationale,
+            afterRationale: afterItem.rationale,
+            beforeSourceKind: oldItem.sourceKind,
+            afterSourceKind: afterItem.sourceKind,
+            textChanged,
+            statusChanged,
+            provenanceChanged,
+          });
+        } else {
+          items.push({
+            section,
+            kind: "removed",
+            beforeText: oldItem.text,
+            beforeStatus: oldItem.status,
+            beforeRationale: oldItem.rationale,
+            beforeSourceKind: oldItem.sourceKind,
+            textChanged: true,
+            statusChanged: false,
+            provenanceChanged: false,
+          });
+        }
       }
     }
 
+  }
+
+  for (const section of ITEM_SECTIONS) {
     after[section].forEach((newItem, index) => {
-      if (used.has(index)) {
-        return;
-      }
+      if (matchedAfter.has(`${section}:${index}`)) return;
       items.push({
         section,
         kind: "added",
@@ -384,14 +564,17 @@ export function compareScopes(
   const findings = compareFindings(
     beforeFindings,
     afterFindings,
+    after,
     questionResolved,
     clarification.question,
+    clarification.confirmed,
   );
 
   const added = items.filter((item) => item.kind === "added").length;
   const removed = items.filter((item) => item.kind === "removed").length;
   const changedItems = items.filter((item) => item.kind === "changed").length;
 
+  const moved = items.filter((item) => item.kind === "moved").length;
   const summary = [
     clarification.confirmed
       ? "Clarification recorded as confirmed by the client."
@@ -399,9 +582,9 @@ export function compareScopes(
     questionResolved
       ? "The selected open question no longer appears in the updated scope."
       : "The selected open question remains open.",
-    added + removed + changedItems === 0
+    added + removed + changedItems === 0 && moved === 0
       ? "No scope items changed."
-      : `${added} item(s) added, ${removed} removed, ${changedItems} changed.`,
+      : `${added} item(s) added, ${removed} removed, ${changedItems} changed${moved ? `, ${moved} moved between sections without changing the decision` : ""}.`,
     `${findings.resolved.length} finding(s) resolved, ${findings.remaining.length} retained, ${findings.changed.length} reworded, ${findings.added.length} new, ${findings.unmatched.length} not re-reported.`,
   ];
 
