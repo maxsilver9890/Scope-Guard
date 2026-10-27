@@ -590,7 +590,7 @@ function ResolveQuestionForm({
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 text-[11px] leading-5 text-rose-800">
+        <p role="alert" className="mt-3 whitespace-pre-line text-[11px] leading-5 text-rose-800">
           {error}
         </p>
       ) : null}
@@ -1208,9 +1208,21 @@ export function ScopeWorkspace({ initialInput }: { initialInput: string }) {
           isRecord(payload) && typeof payload.error === "string"
             ? payload.error
             : null;
+        const conflicts = isRecord(payload) && Array.isArray(payload.conflicts)
+          ? payload.conflicts.flatMap((conflict) => {
+              if (!isRecord(conflict) || typeof conflict.section !== "string" || typeof conflict.commitment !== "string") {
+                return [];
+              }
+              const safeSection = conflict.section.replace(/[^a-zA-Z ]/g, "").slice(0, 48);
+              const safeCommitment = conflict.commitment.replace(/\s+/g, " ").slice(0, 280);
+              return safeCommitment ? [`${safeSection}: ${safeCommitment}`] : [];
+            }).slice(0, 5)
+          : [];
         throw new Error(
-          serverMessage ??
-            "The analysis could not be completed. Please try again.",
+          [
+            serverMessage ?? "The analysis could not be completed. Please try again.",
+            ...(conflicts.length > 0 ? [`Flagged commitments:\n${conflicts.map((conflict) => `• ${conflict}`).join("\n")}`] : []),
+          ].join("\n\n"),
         );
       }
 

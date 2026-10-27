@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-import { reconcileCritique } from "../src/lib/reconcile.ts";
+import { reconcileCritique, ScopeReconciliationError } from "../src/lib/reconcile.ts";
 import type { Finding, Scope } from "../src/lib/schema.ts";
 import {
   compatibleClaims,
@@ -196,11 +196,14 @@ test("a remaining finding cannot validate a still-confirmed conflicting decision
       critiqueScope: async () => [remainingFinding],
     }),
     (error: unknown) => {
-      assert.ok(error instanceof Error);
-      assert.equal(error.name, "ScopeReconciliationError");
+      assert.ok(error instanceof ScopeReconciliationError);
       assert.match(error.message, /marks a decision as confirmed/i);
       assert.match(error.message, /previous results are unchanged/i);
       assert.doesNotMatch(error.message, /change your source/i);
+      assert.deepEqual(error.conflicts, [{
+        section: "inScope",
+        commitment: "Online appointment booking is the approved launch method.",
+      }]);
       return true;
     },
   );
